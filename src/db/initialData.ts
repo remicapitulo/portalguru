@@ -39,7 +39,7 @@ export const initialUsers: User[] = [
     nip: '03.13.01.13',
     nama: 'Abu Haripin, M.Pd',
     password: 'guru',
-    role: 'Guru',
+    role: 'Administrator',
     mapel: 'Bahasa Inggris',
     email: 'abuharipin23@admin.smp.belajar.id',
     avatar: 'H',

@@ -57,10 +57,17 @@ export default function App() {
   const teachers = dbService.getTeachers();
 
   const isAdmin = Boolean(
-    currentUser?.role &&
-    (currentUser.role.toLowerCase() === 'admin' ||
-     currentUser.role.toLowerCase() === 'administrator' ||
-     currentUser.role.toLowerCase().includes('admin'))
+    currentUser && (
+      (currentUser.role && (
+        currentUser.role.toLowerCase() === 'admin' ||
+        currentUser.role.toLowerCase() === 'administrator' ||
+        currentUser.role.toLowerCase().includes('admin')
+      )) ||
+      currentUser.nip?.toLowerCase() === 'admin' ||
+      currentUser.email?.toLowerCase().includes('admin') ||
+      (currentUser.nama && currentUser.nama.toLowerCase().includes('abu haripin')) ||
+      (db.config.headmaster_nip && currentUser.nip === db.config.headmaster_nip)
+    )
   );
 
   // Route-guard: Automatically redirect non-admin (Role: Guru) back to Beranda if attempting to open restricted menus
@@ -86,7 +93,7 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         isCollapsed={isDesktopCollapsed}
         onToggleCollapse={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-        role={currentUser?.role}
+        role={isAdmin ? 'Administrator' : (currentUser?.role || 'Guru')}
         onLogout={handleLogout}
         logoUrl={db.config.school_logo_url}
         schoolName={db.config.school_name}
