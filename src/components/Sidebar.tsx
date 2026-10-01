@@ -96,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Data Guru & Rekap',
       shortLabel: 'Data Guru',
       icon: <Users className="w-5 h-5 text-indigo-400 shrink-0" />,
-      badge: role && role.toLowerCase().includes('admin') ? 'Admin' : undefined,
+      badge: 'Admin',
       badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
     },
     {
@@ -108,6 +108,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     },
   ];
+
+  const isAdmin = Boolean(
+    role &&
+    (role.toLowerCase() === 'admin' ||
+     role.toLowerCase() === 'administrator' ||
+     role.toLowerCase().includes('admin'))
+  );
+
+  // Filter: Hide "Data Guru & Rekap" and "Database Spreadsheet" from Role: Guru
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (item.id === 'data-guru' || item.id === 'db-manager') {
+      return isAdmin;
+    }
+    return true;
+  });
 
   const showCollapsed = isCollapsed && !isOpen;
 
@@ -205,7 +220,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const isActive = currentTab === item.id;
 
             return (

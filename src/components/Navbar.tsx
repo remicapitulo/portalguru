@@ -19,7 +19,7 @@ interface NavbarProps {
   onToggleDesktopCollapse?: () => void;
   onLogout: () => void;
   onOpenLogin: () => void;
-  onOpenDbManager: () => void;
+  onOpenDbManager?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -104,15 +104,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Right: Quick DB Status Pill & User Profile */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Google Sheets Live Status Pill */}
-        <button
-          onClick={onOpenDbManager}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition shrink-0"
-          title="Google Spreadsheet Terhubung (Klik untuk melihat status & sinkronisasi)"
-        >
-          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Sheets: <strong className="text-emerald-700">Tersambung</strong></span>
-        </button>
+        {/* Google Sheets Live Status Pill (Khusus Admin) */}
+        {currentUser &&
+          (currentUser.role.toLowerCase() === 'admin' ||
+           currentUser.role.toLowerCase() === 'administrator' ||
+           currentUser.role.toLowerCase().includes('admin')) &&
+          onOpenDbManager && (
+          <button
+            onClick={onOpenDbManager}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition shrink-0 cursor-pointer"
+            title="Google Spreadsheet Terhubung (Klik untuk melihat status & sinkronisasi)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Sheets: <strong className="text-emerald-700">Tersambung</strong></span>
+          </button>
+        )}
 
         {currentUser ? (
           <div className="flex items-center gap-2 bg-slate-100/90 hover:bg-slate-200/70 p-1.5 sm:pr-3 rounded-full border border-slate-200 transition">

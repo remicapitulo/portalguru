@@ -56,12 +56,32 @@ export default function App() {
 
   const teachers = dbService.getTeachers();
 
+  const isAdmin = Boolean(
+    currentUser?.role &&
+    (currentUser.role.toLowerCase() === 'admin' ||
+     currentUser.role.toLowerCase() === 'administrator' ||
+     currentUser.role.toLowerCase().includes('admin'))
+  );
+
+  // Route-guard: Automatically redirect non-admin (Role: Guru) back to Beranda if attempting to open restricted menus
+  useEffect(() => {
+    if (!isAdmin && (currentTab === 'data-guru' || currentTab === 'db-manager' || currentTab === 'report-print')) {
+      setCurrentTab('beranda');
+    }
+  }, [isAdmin, currentTab]);
+
   return (
     <div className="min-h-screen bg-slate-50 flex antialiased text-slate-900 selection:bg-blue-600 selection:text-white overflow-x-hidden">
       {/* Sidebar: Fixed on left with smooth collapse / expand and mobile drawer */}
       <Sidebar
         currentTab={currentTab === 'report-print' ? 'data-guru' : currentTab}
-        onSelectTab={(tab) => setCurrentTab(tab)}
+        onSelectTab={(tab) => {
+          if (!isAdmin && (tab === 'data-guru' || tab === 'db-manager')) {
+            setCurrentTab('beranda');
+          } else {
+            setCurrentTab(tab);
+          }
+        }}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         isCollapsed={isDesktopCollapsed}
@@ -89,19 +109,25 @@ export default function App() {
             onToggleDesktopCollapse={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
             onLogout={handleLogout}
             onOpenLogin={() => setLoginModalOpen(true)}
-            onOpenDbManager={() => setCurrentTab('db-manager')}
+            onOpenDbManager={isAdmin ? () => setCurrentTab('db-manager') : undefined}
           />
         </div>
 
         {/* Dynamic Page Body */}
         <main className="flex-1 p-3.5 sm:p-6 lg:p-8 print:p-0 min-w-0">
-          {currentTab === 'beranda' && (
+          {(currentTab === 'beranda' || (!isAdmin && (currentTab === 'data-guru' || currentTab === 'db-manager' || currentTab === 'report-print'))) && (
             <BerandaView
               currentUser={currentUser}
               config={db.config}
               events={db.events}
               db={db}
-              onNavigate={(tab) => setCurrentTab(tab)}
+              onNavigate={(tab) => {
+                if (!isAdmin && (tab === 'data-guru' || tab === 'db-manager')) {
+                  setCurrentTab('beranda');
+                } else {
+                  setCurrentTab(tab);
+                }
+              }}
             />
           )}
 
@@ -110,7 +136,7 @@ export default function App() {
               currentUser={currentUser}
               config={db.config}
               allTeachers={teachers}
-              onOpenReportPrint={() => setCurrentTab('report-print')}
+              onOpenReportPrint={isAdmin ? () => setCurrentTab('report-print') : undefined}
             />
           )}
 
@@ -136,7 +162,7 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'data-guru' && (
+          {currentTab === 'data-guru' && isAdmin && (
             <DataGuruView
               currentUser={currentUser}
               config={db.config}
@@ -146,7 +172,7 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'db-manager' && (
+          {currentTab === 'db-manager' && isAdmin && (
             <DatabaseManagerView
               db={db}
               config={db.config}
@@ -154,7 +180,7 @@ export default function App() {
             />
           )}
 
-          {currentTab === 'report-print' && (
+          {currentTab === 'report-print' && isAdmin && (
             <ReportPrintView
               db={db}
               config={db.config}

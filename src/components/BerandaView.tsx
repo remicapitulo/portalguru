@@ -202,7 +202,7 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
       icon: <ClipboardList className="w-6 h-6" />,
       desc: 'Lembar entri nilai tugas harian, PTS, PAS, dan kalkulasi nilai akhir.',
       color: '#d97706',
-      tab: 'data-guru' as NavItem,
+      tab: 'perangkat' as NavItem,
     },
     {
       title: 'Arsip & Administrasi Surat',
@@ -213,7 +213,22 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
     },
   ];
 
-  const filteredMenus = menuCatalog.filter(
+  const isAdmin = Boolean(
+    currentUser?.role &&
+    (currentUser.role.toLowerCase() === 'admin' ||
+     currentUser.role.toLowerCase() === 'administrator' ||
+     currentUser.role.toLowerCase().includes('admin'))
+  );
+
+  // Filter: Hide Data Guru & Rekap and Database Spreadsheet from Role: Guru
+  const accessibleMenus = menuCatalog.filter((m) => {
+    if (m.tab === 'data-guru' || m.tab === 'db-manager') {
+      return isAdmin;
+    }
+    return true;
+  });
+
+  const filteredMenus = accessibleMenus.filter(
     (m) =>
       m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.desc.toLowerCase().includes(searchTerm.toLowerCase())
@@ -265,9 +280,9 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* 1. Total Guru */}
         <div
-          onClick={() => onNavigate('data-guru')}
+          onClick={() => onNavigate(isAdmin ? 'data-guru' : 'perangkat')}
           className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 hover:shadow-md transition cursor-pointer flex items-center gap-2.5 sm:gap-4 group min-w-0"
-          title="Klik untuk membuka daftar lengkap Data Guru"
+          title={isAdmin ? "Klik untuk membuka daftar lengkap Data Guru" : "Kelola Perangkat Pembelajaran"}
         >
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center font-bold transition shrink-0">
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -287,9 +302,9 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
 
         {/* 2. Guru Lengkap (100% 36 slot) */}
         <div
-          onClick={() => onNavigate('data-guru')}
+          onClick={() => onNavigate(isAdmin ? 'data-guru' : 'perangkat')}
           className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 hover:shadow-md transition cursor-pointer flex items-center gap-2.5 sm:gap-4 group min-w-0"
-          title="Klik untuk melihat rekapitulasi kelengkapan berkas guru"
+          title={isAdmin ? "Klik untuk melihat rekapitulasi kelengkapan berkas guru" : "Kelola Perangkat Pembelajaran"}
         >
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 group-hover:bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold transition shrink-0">
             <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
