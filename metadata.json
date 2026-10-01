@@ -1,0 +1,8 @@
+{
+  "name": "Portal Administrasi Guru - SMPIT Pondok Duta 3",
+  "description": "Sistem administrasi guru terpadu, perangkat pembelajaran (Modul Ajar, CP, ATP, Prota, Promes), kalender akademik \u0026 usulan aspirasi berbasis database fleksibel berkinerja tinggi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
