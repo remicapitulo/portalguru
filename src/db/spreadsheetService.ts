@@ -149,10 +149,27 @@ class GoogleSpreadsheetService {
         if (s.npsn) configUpdates.npsn = String(s.npsn).trim();
         if (s.school_address) configUpdates.school_address = String(s.school_address).trim();
         if (s.academic_year) configUpdates.academic_year = String(s.academic_year).trim();
-        if (s.headmaster) configUpdates.headmaster = String(s.headmaster).trim();
-        if (s.headmaster_nip) configUpdates.headmaster_nip = String(s.headmaster_nip).trim();
-        if (s.vice_headmaster) configUpdates.vice_headmaster = String(s.vice_headmaster).trim();
-        if (s.vice_headmaster_nip) configUpdates.vice_headmaster_nip = String(s.vice_headmaster_nip).trim();
+        
+        // Headmaster Name & NIK/NIP
+        if (s.headmaster && s.headmaster !== 'H. Sudirman, M.Pd.I') {
+          configUpdates.headmaster = String(s.headmaster).trim();
+        }
+        const hNip = s.headmaster_nip ?? s.headmaster_nik ?? s.nik_kepala ?? s.nip_kepala ?? s.nik_kepsek ?? s.nip_kepsek;
+        if (hNip !== undefined && hNip !== null && String(hNip).trim() !== '' && String(hNip).trim() !== '197508152002121003') {
+          configUpdates.headmaster_nip = String(hNip).trim();
+          configUpdates.headmaster_nik = String(hNip).trim();
+        }
+
+        // Vice Headmaster Name & NIK/NIP
+        if (s.vice_headmaster && s.vice_headmaster !== 'Drs. H. Ahmad Fauzi, M.Pd') {
+          configUpdates.vice_headmaster = String(s.vice_headmaster).trim();
+        }
+        const vNip = s.vice_headmaster_nip ?? s.vice_headmaster_nik ?? s.nik_wakil ?? s.nip_wakil ?? s.nik_wakasek ?? s.nip_wakasek ?? s.nik_kurikulum;
+        if (vNip !== undefined && vNip !== null && String(vNip).trim() !== '' && String(vNip).trim() !== '197805122005011002') {
+          configUpdates.vice_headmaster_nip = String(vNip).trim();
+          configUpdates.vice_headmaster_nik = String(vNip).trim();
+        }
+
         if (s.vice_headmaster_title) configUpdates.vice_headmaster_title = String(s.vice_headmaster_title).trim();
         if (s.school_logo_url !== undefined && s.school_logo_url !== null) {
           configUpdates.school_logo_url = String(s.school_logo_url).trim();
@@ -555,12 +572,21 @@ class GoogleSpreadsheetService {
       // Immediately reflect updates in local database state
       dbService.updateConfig(settingsData);
 
+      // Ensure both NIP and NIK aliases are sent so any column name in sheet settings matches
+      const payloadSettings = {
+        ...settingsData,
+        headmaster_nik: settingsData.headmaster_nip || settingsData.headmaster_nik || '',
+        vice_headmaster_nik: settingsData.vice_headmaster_nip || settingsData.vice_headmaster_nik || '',
+        nik_wakil: settingsData.vice_headmaster_nip || settingsData.vice_headmaster_nik || '',
+        nik_kepala: settingsData.headmaster_nip || settingsData.headmaster_nik || '',
+      };
+
       const res = await fetch(this.getApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'saveSettings',
-          settingsData,
+          settingsData: payloadSettings,
         }),
       });
       const data = await res.json();

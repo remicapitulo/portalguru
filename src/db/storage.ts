@@ -75,23 +75,42 @@ class FlexibleDatabaseService {
             needsResave = true;
           }
 
-          // Ensure updated config properties (NPSN 20276180, foundation_name, headmaster, vice_headmaster) are active
+          // Clean up any remaining dummy values from old cache to avoid confusion
+          const isDummyHeadmaster = !parsed.config.headmaster || parsed.config.headmaster === 'H. Sudirman, M.Pd.I';
+          const isDummyHeadmasterNip = !parsed.config.headmaster_nip || parsed.config.headmaster_nip === '197508152002121003';
+          const isDummyVice = !parsed.config.vice_headmaster || parsed.config.vice_headmaster === 'Drs. H. Ahmad Fauzi, M.Pd';
+          const isDummyViceNip = !parsed.config.vice_headmaster_nip || parsed.config.vice_headmaster_nip === '197805122005011002';
+
+          if (isDummyHeadmaster || isDummyHeadmasterNip || isDummyVice || isDummyViceNip) {
+            needsResave = true;
+          }
+
+          const cleanViceNip = isDummyViceNip
+            ? '02.20.09.112'
+            : (parsed.config.vice_headmaster_nip || parsed.config.vice_headmaster_nik || '02.20.09.112');
+          const cleanHeadNip = isDummyHeadmasterNip
+            ? '03.18.10.49'
+            : (parsed.config.headmaster_nip || parsed.config.headmaster_nik || '03.18.10.49');
+
           parsed.config = {
-            ...initialConfig,
-            ...parsed.config,
-            npsn: (parsed.config.npsn === '20268412' || !parsed.config.npsn) ? '20276180' : parsed.config.npsn,
-            foundation_name: (!parsed.config.foundation_name || parsed.config.foundation_name === 'Yayasan Pondok Duta')
-              ? 'Yayasan Perguruan Islam Pondok Duta'
-              : parsed.config.foundation_name,
-            headmaster: parsed.config.headmaster || 'H. Sudirman, M.Pd.I',
-            headmaster_nip: parsed.config.headmaster_nip || '197508152002121003',
-            vice_headmaster: parsed.config.vice_headmaster || 'Drs. H. Ahmad Fauzi, M.Pd',
-            vice_headmaster_nip: parsed.config.vice_headmaster_nip || '197805122005011002',
-            vice_headmaster_title: (!parsed.config.vice_headmaster_title || parsed.config.vice_headmaster_title.includes('Administrasi'))
-              ? 'Tim Kurikulum'
-              : parsed.config.vice_headmaster_title,
-            logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'
-          };
+              ...initialConfig,
+              ...parsed.config,
+              npsn: (parsed.config.npsn === '20268412' || !parsed.config.npsn) ? '20276180' : parsed.config.npsn,
+              foundation_name: (!parsed.config.foundation_name || parsed.config.foundation_name === 'Yayasan Pondok Duta')
+                ? 'Yayasan Perguruan Islam Pondok Duta'
+                : parsed.config.foundation_name,
+              headmaster: isDummyHeadmaster ? 'Abu Haripin, M.Pd' : parsed.config.headmaster,
+              headmaster_nip: cleanHeadNip,
+              headmaster_nik: cleanHeadNip,
+              vice_headmaster: isDummyVice ? 'Nilam Cahya, S.Pd' : parsed.config.vice_headmaster,
+              vice_headmaster_nip: cleanViceNip,
+              vice_headmaster_nik: cleanViceNip,
+              vice_headmaster_title: (!parsed.config.vice_headmaster_title || parsed.config.vice_headmaster_title.includes('Administrasi'))
+                ? 'Tim Kurikulum'
+                : parsed.config.vice_headmaster_title,
+              school_logo_url: parsed.config.school_logo_url || 'https://lh3.googleusercontent.com/d/1mnkKRHv-bqHsof1Lz4qdJd-o',
+              logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'
+            };
 
           if (needsResave) {
             try {
@@ -255,7 +274,19 @@ class FlexibleDatabaseService {
   }
 
   public updateConfig(updates: Partial<SchoolConfig>) {
-    this.db.config = { ...this.db.config, ...updates };
+    const sanitized = { ...updates };
+    // Synchronize NIP and NIK aliases so both vice_headmaster_nip and vice_headmaster_nik always match
+    if (sanitized.vice_headmaster_nik !== undefined && !sanitized.vice_headmaster_nip) {
+      sanitized.vice_headmaster_nip = sanitized.vice_headmaster_nik;
+    } else if (sanitized.vice_headmaster_nip !== undefined) {
+      sanitized.vice_headmaster_nik = sanitized.vice_headmaster_nip;
+    }
+    if (sanitized.headmaster_nik !== undefined && !sanitized.headmaster_nip) {
+      sanitized.headmaster_nip = sanitized.headmaster_nik;
+    } else if (sanitized.headmaster_nip !== undefined) {
+      sanitized.headmaster_nik = sanitized.headmaster_nip;
+    }
+    this.db.config = { ...this.db.config, ...sanitized };
     this.saveToStorage();
   }
 

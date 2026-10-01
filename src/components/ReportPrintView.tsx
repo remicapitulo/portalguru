@@ -751,10 +751,10 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({
                           margin: 0,
                         }}
                       >
-                        {config.headmaster || 'H. Sudirman, M.Pd.I'}
+                        {config.headmaster || 'Abu Haripin, M.Pd'}
                       </p>
                       <p style={{ fontSize: '10px', color: '#475569', fontFamily: 'monospace', margin: '3px 0 0 0' }}>
-                        NIK. {config.headmaster_nip || '197508152002121003'}
+                        NIK. {config.headmaster_nip || '03.18.10.49'}
                       </p>
                     </div>
 
@@ -775,10 +775,10 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({
                           margin: 0,
                         }}
                       >
-                        {config.vice_headmaster || 'Drs. H. Ahmad Fauzi, M.Pd'}
+                        {config.vice_headmaster || 'Nilam Cahya, S.Pd'}
                       </p>
                       <p style={{ fontSize: '10px', color: '#475569', fontFamily: 'monospace', margin: '3px 0 0 0' }}>
-                        NIK. {config.vice_headmaster_nip || '197805122005011002'}
+                        NIK. {config.vice_headmaster_nip || '02.20.09.112'}
                       </p>
                     </div>
                   </div>

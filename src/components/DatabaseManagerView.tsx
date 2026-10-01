@@ -55,10 +55,12 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
   const [academicYear, setAcademicYear] = useState(config.academic_year || '2026/2027');
   const [npsn, setNpsn] = useState(config.npsn || '20276180');
   const [schoolAddress, setSchoolAddress] = useState(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat');
-  const [headmaster, setHeadmaster] = useState(config.headmaster || 'H. Sudirman, M.Pd.I');
-  const [headmasterNip, setHeadmasterNip] = useState(config.headmaster_nip || '197508152002121003');
-  const [viceHeadmaster, setViceHeadmaster] = useState(config.vice_headmaster || 'Drs. H. Ahmad Fauzi, M.Pd');
-  const [viceHeadmasterNip, setViceHeadmasterNip] = useState(config.vice_headmaster_nip || '197805122005011002');
+  const [headmaster, setHeadmaster] = useState(config.headmaster || 'Abu Haripin, M.Pd');
+  const [headmasterNip, setHeadmasterNip] = useState(config.headmaster_nip || '03.18.10.49');
+  const [viceHeadmaster, setViceHeadmaster] = useState(config.vice_headmaster || 'Nilam Cahya, S.Pd');
+  const [viceHeadmasterNip, setViceHeadmasterNip] = useState(
+    config.vice_headmaster_nip || config.vice_headmaster_nik || '02.20.09.112'
+  );
   const [viceHeadmasterTitle, setViceHeadmasterTitle] = useState(
     !config.vice_headmaster_title || config.vice_headmaster_title.includes('Administrasi')
       ? 'Tim Kurikulum'
@@ -97,10 +99,12 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
     setAcademicYear(config.academic_year || '2026/2027');
     setNpsn(config.npsn || '20276180');
     setSchoolAddress(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat');
-    setHeadmaster(config.headmaster || 'H. Sudirman, M.Pd.I');
-    setHeadmasterNip(config.headmaster_nip || '197508152002121003');
-    setViceHeadmaster(config.vice_headmaster || 'Drs. H. Ahmad Fauzi, M.Pd');
-    setViceHeadmasterNip(config.vice_headmaster_nip || '197805122005011002');
+    setHeadmaster(config.headmaster || 'Abu Haripin, M.Pd');
+    setHeadmasterNip(config.headmaster_nip || '03.18.10.49');
+    setViceHeadmaster(config.vice_headmaster || 'Nilam Cahya, S.Pd');
+    setViceHeadmasterNip(
+      config.vice_headmaster_nip || config.vice_headmaster_nik || '02.20.09.112'
+    );
     setViceHeadmasterTitle(
       !config.vice_headmaster_title || config.vice_headmaster_title.includes('Administrasi')
         ? 'Tim Kurikulum'
@@ -238,10 +242,12 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
       academic_year: academicYear.trim(),
       npsn: npsn.trim() || '20276180',
       school_address: schoolAddress.trim(),
-      headmaster: headmaster.trim() || 'H. Sudirman, M.Pd.I',
-      headmaster_nip: headmasterNip.trim() || '197508152002121003',
-      vice_headmaster: viceHeadmaster.trim() || 'Drs. H. Ahmad Fauzi, M.Pd',
-      vice_headmaster_nip: viceHeadmasterNip.trim() || '197805122005011002',
+      headmaster: headmaster.trim() || 'Abu Haripin, M.Pd',
+      headmaster_nip: headmasterNip.trim() || '03.18.10.49',
+      headmaster_nik: headmasterNip.trim() || '03.18.10.49',
+      vice_headmaster: viceHeadmaster.trim() || 'Nilam Cahya, S.Pd',
+      vice_headmaster_nip: viceHeadmasterNip.trim() || '02.20.09.112',
+      vice_headmaster_nik: viceHeadmasterNip.trim() || '02.20.09.112',
       vice_headmaster_title: viceHeadmasterTitle.trim() || 'Tim Kurikulum',
       school_logo_url: schoolLogoUrl.trim(),
       logo_folder_id: logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
@@ -371,11 +377,10 @@ function getOrCreateSheet(sheetName) {
       sheet.appendRow(["foundation_name", "${foundationName.trim() || 'Yayasan Perguruan Islam Pondok Duta'}", "Nama Yayasan (Kop Surat)"]);
       sheet.appendRow(["npsn", "${npsn.trim() || '20276180'}", "Nomor Pokok Sekolah Nasional"]);
       sheet.appendRow(["school_address", "${schoolAddress.trim() || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}", "Alamat Lengkap"]);
-      sheet.appendRow(["academic_year", "${academicYear.trim() || '2026/2027'}", "Tahun Ajaran Aktif"]);
-      sheet.appendRow(["headmaster", "${headmaster.trim() || 'H. Sudirman, M.Pd.I'}", "Kepala Sekolah (Tanda Tangan Kiri)"]);
-      sheet.appendRow(["headmaster_nip", "${headmasterNip.trim() || '197508152002121003'}", "NIK Kepala Sekolah"]);
-      sheet.appendRow(["vice_headmaster", "${viceHeadmaster.trim() || 'Drs. H. Ahmad Fauzi, M.Pd'}", "Wakil Kepala Sekolah / Tim Kurikulum"]);
-      sheet.appendRow(["vice_headmaster_nip", "${viceHeadmasterNip.trim() || '197805122005011002'}", "NIK Wakil Kepala Sekolah"]);
+      sheet.appendRow(["headmaster", "${headmaster.trim() || 'Abu Haripin, M.Pd'}", "Kepala Sekolah (Tanda Tangan Kiri)"]);
+      sheet.appendRow(["headmaster_nip", "${headmasterNip.trim() || '03.18.10.49'}", "NIK Kepala Sekolah"]);
+      sheet.appendRow(["vice_headmaster", "${viceHeadmaster.trim() || 'Nilam Cahya, S.Pd'}", "Wakil Kepala Sekolah / Tim Kurikulum"]);
+      sheet.appendRow(["vice_headmaster_nip", "${viceHeadmasterNip.trim() || '02.20.09.112'}", "NIK Wakil Kepala Sekolah"]);
       sheet.appendRow(["vice_headmaster_title", "${viceHeadmasterTitle.trim() || 'Tim Kurikulum'}", "Jabatan Penandatangan (Tanda Tangan Kanan)"]);
       sheet.appendRow(["school_logo_url", "${schoolLogoUrl.trim() || ''}", "URL Gambar Logo Sekolah (Google Drive / Online)"]);
       sheet.appendRow(["logo_folder_id", "${logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}", "Folder Google Drive Logo Sekolah"]);
@@ -1010,18 +1015,34 @@ function normalizeSettingKey(rawKey) {
   if (!rawKey) return "";
   var k = String(rawKey).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
   
-  if (k.indexOf("school_name") !== -1 || k.indexOf("nama_sekolah") !== -1 || k === "sekolah") return "school_name";
+  // 1. PRIORITAS UTAMA: NIK / NIP dievaluasi LEBIH DULU agar tidak tertukar dengan nama pejabat!
+  var isNikOrNip = k.indexOf("nik") !== -1 || k.indexOf("nip") !== -1;
+  var isWakil = k.indexOf("wakil") !== -1 || k.indexOf("vice") !== -1 || k.indexOf("wakasek") !== -1 || k.indexOf("kurikulum") !== -1;
+  var isKepala = k.indexOf("kepala") !== -1 || k.indexOf("headmaster") !== -1 || k.indexOf("kepsek") !== -1;
+
+  if (isNikOrNip && isWakil) return "vice_headmaster_nip";
+  if (isNikOrNip && isKepala) return "headmaster_nip";
+  if (isNikOrNip && (k === "nik" || k === "nip" || k === "nik_wakil" || k === "nip_wakil")) return "vice_headmaster_nip";
+
+  // 2. Evaluasi Jabatan / Title Penandatangan
+  if (k.indexOf("title") !== -1 || k.indexOf("jabatan") !== -1 || k.indexOf("posisi") !== -1) return "vice_headmaster_title";
+
+  // 3. Evaluasi Nama Pejabat
+  if (isWakil) return "vice_headmaster";
+  if (isKepala) return "headmaster";
+
+  // 4. Identitas Satuan Pendidikan & Sekolah
+  if (k.indexOf("school_name") !== -1 || k.indexOf("nama_sekolah") !== -1 || k === "sekolah" || k.indexOf("nama_satuan") !== -1) return "school_name";
   if (k.indexOf("foundation") !== -1 || k.indexOf("yayasan") !== -1) return "foundation_name";
   if (k.indexOf("npsn") !== -1) return "npsn";
   if (k.indexOf("address") !== -1 || k.indexOf("alamat") !== -1) return "school_address";
-  if (k.indexOf("academic_year") !== -1 || k.indexOf("tahun_ajaran") !== -1 || k.indexOf("th_ajaran") !== -1) return "academic_year";
-  if (k === "headmaster" || k.indexOf("kepala_sekolah") !== -1 || k === "kepsek") return "headmaster";
-  if (k.indexOf("headmaster_nip") !== -1 || k.indexOf("nip_kepala") !== -1 || k.indexOf("nik_kepala") !== -1 || k.indexOf("nip_kepsek") !== -1 || k.indexOf("nik_kepsek") !== -1) return "headmaster_nip";
-  if (k === "vice_headmaster" || k.indexOf("wakil_kepala") !== -1 || k === "wakasek" || k.indexOf("kurikulum") !== -1) return "vice_headmaster";
-  if (k.indexOf("vice_headmaster_nip") !== -1 || k.indexOf("nip_wakil") !== -1 || k.indexOf("nik_wakil") !== -1 || k.indexOf("nip_wakasek") !== -1 || k.indexOf("nik_wakasek") !== -1) return "vice_headmaster_nip";
-  if (k.indexOf("vice_headmaster_title") !== -1 || k.indexOf("jabatan") !== -1 || k.indexOf("title") !== -1) return "vice_headmaster_title";
-  if (k.indexOf("logo_url") !== -1 || k.indexOf("school_logo") !== -1 || k === "logo" || k.indexOf("logo_sekolah") !== -1) return "school_logo_url";
+  if (k.indexOf("academic_year") !== -1 || k.indexOf("tahun_ajaran") !== -1 || k.indexOf("th_ajaran") !== -1 || k.indexOf("tapel") !== -1) return "academic_year";
+
+  // 5. Logo & Folder Google Drive
   if (k.indexOf("logo_folder") !== -1 || k.indexOf("folder_logo") !== -1) return "logo_folder_id";
+  if (k.indexOf("logo") !== -1) return "school_logo_url";
+  if (k.indexOf("drive_folder_perangkat") !== -1 || k.indexOf("folder_perangkat") !== -1) return "drive_folder_perangkat_id";
+  if (k.indexOf("drive_folder") !== -1 || k.indexOf("folder_drive") !== -1 || k.indexOf("folder_arsip") !== -1) return "drive_folder_id";
   
   return k;
 }
@@ -1041,29 +1062,68 @@ function getSettingsFromSheet() {
       npsn: "${npsn.trim() || '20276180'}",
       school_address: "${schoolAddress.trim() || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}",
       academic_year: "${academicYear.trim() || '2026/2027'}",
-      headmaster: "${headmaster.trim() || 'H. Sudirman, M.Pd.I'}",
-      headmaster_nip: "${headmasterNip.trim() || '197508152002121003'}",
-      vice_headmaster: "${viceHeadmaster.trim() || 'Drs. H. Ahmad Fauzi, M.Pd'}",
-      vice_headmaster_nip: "${viceHeadmasterNip.trim() || '197805122005011002'}",
+      headmaster: "${headmaster.trim() || 'Abu Haripin, M.Pd'}",
+      headmaster_nip: "${headmasterNip.trim() || '03.18.10.49'}",
+      headmaster_nik: "${headmasterNip.trim() || '03.18.10.49'}",
+      vice_headmaster: "${viceHeadmaster.trim() || 'Nilam Cahya, S.Pd'}",
+      vice_headmaster_nip: "${viceHeadmasterNip.trim() || '02.20.09.112'}",
+      vice_headmaster_nik: "${viceHeadmasterNip.trim() || '02.20.09.112'}",
       vice_headmaster_title: "${viceHeadmasterTitle.trim() || 'Tim Kurikulum'}",
       school_logo_url: "${schoolLogoUrl.trim() || ''}",
       logo_folder_id: "${logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}"
     };
 
-    if (data.length <= 1 || (data.length === 1 && !data[0][0])) {
+    if (data.length === 0 || (data.length === 1 && !data[0][0])) {
       saveSettingsToSheet(settings);
       return settings;
     }
 
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      var rawKey = String(row[0] || "").trim();
-      var rawVal = row[1];
-      if (!rawKey) continue;
+    // A. Deteksi format tabel horizontal (Baris 1 = Kolom Header, Baris 2 = Nilai Data)
+    var isHorizontal = false;
+    if (data.length >= 2) {
+      var headerMatches = 0;
+      for (var c = 0; c < data[0].length; c++) {
+        var kCheck = normalizeSettingKey(data[0][c]);
+        if (kCheck && ["headmaster", "headmaster_nip", "vice_headmaster", "vice_headmaster_nip", "school_name", "npsn"].indexOf(kCheck) !== -1) {
+          headerMatches++;
+        }
+      }
+      if (headerMatches >= 2) {
+        isHorizontal = true;
+        for (var c = 0; c < data[0].length; c++) {
+          var hKey = normalizeSettingKey(data[0][c]);
+          var hVal = data[1][c];
+          if (hKey && hVal !== undefined && hVal !== null && String(hVal).trim() !== "") {
+            settings[hKey] = String(hVal).trim();
+            if (hKey === "vice_headmaster_nip") settings["vice_headmaster_nik"] = String(hVal).trim();
+            if (hKey === "headmaster_nip") settings["headmaster_nik"] = String(hVal).trim();
+          }
+        }
+      }
+    }
 
-      var normKey = normalizeSettingKey(rawKey);
-      if (normKey && rawVal !== undefined && rawVal !== null) {
-        settings[normKey] = String(rawVal).trim();
+    // B. Format baris Key-Value vertikal (Kolom A = Key, Kolom B = Value)
+    if (!isHorizontal) {
+      for (var i = 0; i < data.length; i++) {
+        var row = data[i];
+        if (!row || row.length === 0) continue;
+        
+        var rawKey = String(row[0] || "").trim();
+        var rawVal = row[1];
+
+        // Jika kolom 0 adalah nomor urut (1, 2, 3), coba kolom 1 sebagai key dan kolom 2 sebagai value
+        if (/^\\d+$/.test(rawKey) && row.length >= 3 && row[1]) {
+          rawKey = String(row[1]).trim();
+          rawVal = row[2];
+        }
+
+        if (!rawKey) continue;
+        var normKey = normalizeSettingKey(rawKey);
+        if (normKey && rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== "") {
+          settings[normKey] = String(rawVal).trim();
+          if (normKey === "vice_headmaster_nip") settings["vice_headmaster_nik"] = String(rawVal).trim();
+          if (normKey === "headmaster_nip") settings["headmaster_nik"] = String(rawVal).trim();
+        }
       }
     }
 
@@ -1072,8 +1132,12 @@ function getSettingsFromSheet() {
     Logger.log("Error getSettingsFromSheet: " + err.toString());
     return {
       school_name: "SMPIT Pondok Duta",
-      headmaster: "H. Sudirman, M.Pd.I",
-      vice_headmaster: "Drs. H. Ahmad Fauzi, M.Pd",
+      headmaster: "Abu Haripin, M.Pd",
+      headmaster_nip: "03.18.10.49",
+      headmaster_nik: "03.18.10.49",
+      vice_headmaster: "Nilam Cahya, S.Pd",
+      vice_headmaster_nip: "02.20.09.112",
+      vice_headmaster_nik: "02.20.09.112",
       vice_headmaster_title: "Tim Kurikulum",
       logo_folder_id: "1tFn4GYU5d231gJgqXSphAAGlyueOkljJ"
     };
@@ -1579,7 +1643,7 @@ function deleteUsulanFromSheet(rowIndex) {
                       type="text"
                       value={headmaster}
                       onChange={(e) => setHeadmaster(e.target.value)}
-                      placeholder="H. Sudirman, M.Pd.I"
+                      placeholder="Abu Haripin, M.Pd"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900 focus:border-blue-600 outline-none"
                       required
                     />
@@ -1596,7 +1660,7 @@ function deleteUsulanFromSheet(rowIndex) {
                       type="text"
                       value={headmasterNip}
                       onChange={(e) => setHeadmasterNip(e.target.value)}
-                      placeholder="197508152002121003"
+                      placeholder="03.18.10.49"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs text-slate-900 focus:border-blue-600 outline-none"
                     />
                     <span className="text-[10px] text-slate-500 mt-1 block">
@@ -1624,7 +1688,7 @@ function deleteUsulanFromSheet(rowIndex) {
                       type="text"
                       value={viceHeadmaster}
                       onChange={(e) => setViceHeadmaster(e.target.value)}
-                      placeholder="Drs. H. Ahmad Fauzi, M.Pd"
+                      placeholder="Nilam Cahya, S.Pd"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-semibold text-slate-900 focus:border-indigo-600 outline-none"
                       required
                     />
@@ -1641,7 +1705,7 @@ function deleteUsulanFromSheet(rowIndex) {
                       type="text"
                       value={viceHeadmasterNip}
                       onChange={(e) => setViceHeadmasterNip(e.target.value)}
-                      placeholder="197805122005011002"
+                      placeholder="02.20.09.112"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs text-slate-900 focus:border-indigo-600 outline-none"
                     />
                   </div>

@@ -86,8 +86,10 @@ export interface SchoolConfig {
   semester_active: SemesterType;
   headmaster: string;
   headmaster_nip?: string;
+  headmaster_nik?: string;
   vice_headmaster?: string;
   vice_headmaster_nip?: string;
+  vice_headmaster_nik?: string;
   vice_headmaster_title?: string;
   school_address: string;
   npsn: string;
