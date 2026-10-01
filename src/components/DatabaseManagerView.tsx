@@ -22,7 +22,8 @@ import {
   Image as ImageIcon,
   ArrowRight,
   AlertTriangle,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { AppDatabase, SchoolConfig } from '../types';
 import { dbService } from '../db/storage';
@@ -64,8 +65,12 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
       : config.vice_headmaster_title
   );
   const [schoolLogoUrl, setSchoolLogoUrl] = useState(config.school_logo_url || '');
+  const [logoFolderId, setLogoFolderId] = useState(config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ');
   const [logoUrlInput, setLogoUrlInput] = useState('');
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
   const [driveFolderId, setDriveFolderId] = useState(config.drive_folder_id || '1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS');
   const [driveFolderPerangkatId, setDriveFolderPerangkatId] = useState(
     config.drive_folder_perangkat_id || '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp'
@@ -102,50 +107,130 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
         : config.vice_headmaster_title
     );
     setSchoolLogoUrl(config.school_logo_url || '');
+    setLogoFolderId(config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ');
     setDriveFolderId(config.drive_folder_id || '1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS');
     setDriveFolderPerangkatId(config.drive_folder_perangkat_id || '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp');
   }, [config]);
 
+  // Helper to normalize Google Drive image links so they work universally in <img> and PDF
+  const normalizeLogoUrl = (rawUrl: string): string => {
+    if (!rawUrl) return '';
+    const trimmed = rawUrl.trim();
+    const matchFile = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchFile && matchFile[1]) {
+      return `https://lh3.googleusercontent.com/d/${matchFile[1]}`;
+    }
+    const matchId = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (matchId && matchId[1]) {
+      return `https://lh3.googleusercontent.com/d/${matchId[1]}`;
+    }
+    return trimmed;
+  };
+
+  // Upload logo directly to Google Drive Folder: 1tFn4GYU5d231gJgqXSphAAGlyueOkljJ and sheet "settings"
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setLogoError('Ukuran file logo maksimal 2 MB.');
-        setTimeout(() => setLogoError(null), 4000);
-        return;
-      }
-      setLogoError(null);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        setSchoolLogoUrl(base64);
-        dbService.updateConfig({ school_logo_url: base64 });
-        setIdentitySaved(true);
-        setTimeout(() => setIdentitySaved(false), 3000);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError('Ukuran file logo maksimal 5 MB.');
+      setTimeout(() => setLogoError(null), 4000);
+      return;
     }
+
+    setLogoError(null);
+    setIsUploadingLogo(true);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      // Optimistic preview in UI
+      setSchoolLogoUrl(base64);
+
+      try {
+        const uploadRes = await spreadsheetService.uploadLogo(
+          { name: file.name, data: base64 },
+          logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'
+        );
+
+        if (uploadRes && uploadRes.success && uploadRes.fileUrl) {
+          const directUrl = uploadRes.fileUrl;
+          setSchoolLogoUrl(directUrl);
+          dbService.updateConfig({
+            school_logo_url: directUrl,
+            logo_folder_id: logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'
+          });
+          setSyncFeedback({
+            success: true,
+            msg: 'Logo berhasil disimpan ke Google Drive (Folder: 1tFn4GYU5d231gJgqXSphAAGlyueOkljJ) & tersimpan di database sheet "settings"! Otomatis aktif di semua perangkat.'
+          });
+        } else {
+          dbService.updateConfig({ school_logo_url: base64 });
+          setSyncFeedback({
+            success: true,
+            msg: uploadRes?.message || 'Logo tersimpan di browser ini. Perbarui skrip Code.gs di Google Spreadsheet agar otomatis tersimpan ke folder Google Drive & sheet "settings".'
+          });
+        }
+      } catch (uploadErr: any) {
+        dbService.updateConfig({ school_logo_url: base64 });
+        setSyncFeedback({
+          success: true,
+          msg: 'Logo tersimpan di browser ini. Pastikan skrip Code.gs di Spreadsheet sudah diterapkan.'
+        });
+      } finally {
+        setIsUploadingLogo(false);
+        setIdentitySaved(true);
+        setTimeout(() => {
+          setIdentitySaved(false);
+          setSyncFeedback(null);
+        }, 5000);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleApplyLogoUrl = () => {
+  const handleApplyLogoUrl = async () => {
     if (!logoUrlInput.trim()) return;
-    setSchoolLogoUrl(logoUrlInput.trim());
-    dbService.updateConfig({ school_logo_url: logoUrlInput.trim() });
+    const url = normalizeLogoUrl(logoUrlInput.trim());
+    setSchoolLogoUrl(url);
+    dbService.updateConfig({ school_logo_url: url });
     setLogoUrlInput('');
     setIdentitySaved(true);
-    setTimeout(() => setIdentitySaved(false), 3000);
+    try {
+      const res = await spreadsheetService.saveSettings({ school_logo_url: url });
+      if (res && res.success) {
+        setSyncFeedback({ success: true, msg: 'Tautan logo berhasil disimpan ke database sheet "settings"!' });
+      }
+    } catch (e) {}
+    setTimeout(() => {
+      setIdentitySaved(false);
+      setSyncFeedback(null);
+    }, 4000);
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = async () => {
     setSchoolLogoUrl('');
     dbService.updateConfig({ school_logo_url: '' });
     setIdentitySaved(true);
-    setTimeout(() => setIdentitySaved(false), 3000);
+    try {
+      const res = await spreadsheetService.saveSettings({ school_logo_url: '' });
+      if (res && res.success) {
+        setSyncFeedback({ success: true, msg: 'Logo dihapus dari database sheet "settings"!' });
+      }
+    } catch (e) {}
+    setTimeout(() => {
+      setIdentitySaved(false);
+      setSyncFeedback(null);
+    }, 4000);
   };
 
-  const handleSaveAllConfig = (e?: React.FormEvent) => {
+  // Save all config & synchronize directly with Google Spreadsheet sheet "settings"
+  const handleSaveAllConfig = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    dbService.updateConfig({
+    setIsSavingSettings(true);
+    setSyncFeedback(null);
+
+    const updatedConfig = {
       spreadsheet_id: spreadsheetId.trim(),
       apps_script_url: appsScriptUrl.trim(),
       school_name: schoolName.trim(),
@@ -159,15 +244,69 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
       vice_headmaster_nip: viceHeadmasterNip.trim() || '197805122005011002',
       vice_headmaster_title: viceHeadmasterTitle.trim() || 'Tim Kurikulum',
       school_logo_url: schoolLogoUrl.trim(),
+      logo_folder_id: logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
       drive_folder_id: driveFolderId.trim(),
       drive_folder_perangkat_id: driveFolderPerangkatId.trim()
-    });
+    };
+
+    // 1. Update local database immediately
+    dbService.updateConfig(updatedConfig);
     setConfigSaved(true);
     setIdentitySaved(true);
-    setTimeout(() => {
-      setConfigSaved(false);
-      setIdentitySaved(false);
-    }, 3000);
+
+    // 2. Synchronize directly to Google Spreadsheet Sheet "settings"
+    try {
+      const res = await spreadsheetService.saveSettings(updatedConfig);
+      if (res && res.success) {
+        setSyncFeedback({
+          success: true,
+          msg: 'Data profil pimpinan, penandatangan, dan logo berhasil disimpan ke database Google Spreadsheet (Sheet "settings")! Perubahan otomatis aktif di semua perangkat dan laporan cetak.'
+        });
+      } else {
+        setSyncFeedback({
+          success: true,
+          msg: res?.message || 'Data tersimpan di browser ini. Perbarui skrip Code.gs di Google Spreadsheet agar sheet "settings" otomatis tersinkron ke semua perangkat.'
+        });
+      }
+    } catch (err: any) {
+      console.warn('saveSettings notice:', err);
+    } finally {
+      setIsSavingSettings(false);
+      setTimeout(() => {
+        setConfigSaved(false);
+        setIdentitySaved(false);
+        setSyncFeedback(null);
+      }, 5000);
+    }
+  };
+
+  // Pull settings directly from Google Spreadsheet Sheet "settings"
+  const handleFetchSettingsFromSheet = async () => {
+    setIsSyncing(true);
+    setSyncFeedback(null);
+    try {
+      const res = await spreadsheetService.fetchSettings();
+      if (res && res.success && res.data) {
+        dbService.updateConfig(res.data);
+        setSyncFeedback({
+          success: true,
+          msg: 'Data profil pimpinan dan logo berhasil ditarik dari sheet "settings" Google Spreadsheet!'
+        });
+      } else {
+        setSyncFeedback({
+          success: false,
+          msg: res?.message || 'Belum ada data di sheet "settings" atau skrip Apps Script belum diperbarui.'
+        });
+      }
+    } catch (e: any) {
+      setSyncFeedback({
+        success: false,
+        msg: 'Gagal mengambil data dari sheet settings: ' + (e.message || String(e))
+      });
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncFeedback(null), 5000);
+    }
   };
 
   const handleSyncNow = async () => {
@@ -224,6 +363,22 @@ function getOrCreateSheet(sheetName) {
       sheet.appendRow(["No", "Academic Year", "Folder ID", "Folder Perangkat"]);
       sheet.appendRow([1, "2026/2027", "1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS", "1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp"]);
       sheet.getRange("A1:D1").setFontWeight("bold").setBackground("#e2e8f0");
+    } else if (sheetName === "settings") {
+      sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(["Pengaturan (Key)", "Nilai (Value)", "Keterangan"]);
+      sheet.getRange("A1:C1").setFontWeight("bold").setBackground("#e2e8f0");
+      sheet.appendRow(["school_name", "${schoolName.trim() || 'SMPIT Pondok Duta'}", "Nama Satuan Pendidikan"]);
+      sheet.appendRow(["foundation_name", "${foundationName.trim() || 'Yayasan Perguruan Islam Pondok Duta'}", "Nama Yayasan (Kop Surat)"]);
+      sheet.appendRow(["npsn", "${npsn.trim() || '20276180'}", "Nomor Pokok Sekolah Nasional"]);
+      sheet.appendRow(["school_address", "${schoolAddress.trim() || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}", "Alamat Lengkap"]);
+      sheet.appendRow(["academic_year", "${academicYear.trim() || '2026/2027'}", "Tahun Ajaran Aktif"]);
+      sheet.appendRow(["headmaster", "${headmaster.trim() || 'H. Sudirman, M.Pd.I'}", "Kepala Sekolah (Tanda Tangan Kiri)"]);
+      sheet.appendRow(["headmaster_nip", "${headmasterNip.trim() || '197508152002121003'}", "NIK Kepala Sekolah"]);
+      sheet.appendRow(["vice_headmaster", "${viceHeadmaster.trim() || 'Drs. H. Ahmad Fauzi, M.Pd'}", "Wakil Kepala Sekolah / Tim Kurikulum"]);
+      sheet.appendRow(["vice_headmaster_nip", "${viceHeadmasterNip.trim() || '197805122005011002'}", "NIK Wakil Kepala Sekolah"]);
+      sheet.appendRow(["vice_headmaster_title", "${viceHeadmasterTitle.trim() || 'Tim Kurikulum'}", "Jabatan Penandatangan (Tanda Tangan Kanan)"]);
+      sheet.appendRow(["school_logo_url", "${schoolLogoUrl.trim() || ''}", "URL Gambar Logo Sekolah (Google Drive / Online)"]);
+      sheet.appendRow(["logo_folder_id", "${logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}", "Folder Google Drive Logo Sekolah"]);
     } else {
       sheet = ss.insertSheet(sheetName);
     }
@@ -766,6 +921,13 @@ function doGet(e) {
   try {
     const action = e && e.parameter ? e.parameter.action : null;
 
+    if (action === "getSettings" || action === "settings") {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        data: getSettingsFromSheet()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === "getUsers" || action === "getTeachers") {
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
@@ -794,11 +956,12 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Default action: getEvents
+    // Default action: getEvents (juga menyertakan data settings agar tersinkron otomatis)
     return ContentService.createTextOutput(JSON.stringify({
       success: true,
       data: getEventsData(),
-      academicFolder: getActiveFolderMetadata()
+      academicFolder: getActiveFolderMetadata(),
+      settings: getSettingsFromSheet()
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
@@ -814,7 +977,11 @@ function doPost(e) {
     const action = requestData.action;
     let result = { success: false, message: "Aksi tidak dikenal: " + action };
 
-    if (action === "processTeacherUpload" || action === "uploadPerangkat") {
+    if (action === "saveSettings") {
+      result = saveSettingsToSheet(requestData.settingsData);
+    } else if (action === "uploadLogo") {
+      result = uploadLogoToDrive(requestData.fileData, requestData.folder_id || "1tFn4GYU5d231gJgqXSphAAGlyueOkljJ");
+    } else if (action === "processTeacherUpload" || action === "uploadPerangkat") {
       result = processTeacherUpload(requestData.fileData, requestData.metaData);
     } else if (action === "deletePerangkat") {
       result = deletePerangkat(requestData.recordId, requestData.teacherId, requestData.fileName, requestData.fileUrl);
@@ -835,6 +1002,221 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ success: false, message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ===== PENGATURAN SHEET "settings" & UPLOAD LOGO GOOGLE DRIVE =====
+function normalizeSettingKey(rawKey) {
+  if (!rawKey) return "";
+  var k = String(rawKey).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
+  
+  if (k.indexOf("school_name") !== -1 || k.indexOf("nama_sekolah") !== -1 || k === "sekolah") return "school_name";
+  if (k.indexOf("foundation") !== -1 || k.indexOf("yayasan") !== -1) return "foundation_name";
+  if (k.indexOf("npsn") !== -1) return "npsn";
+  if (k.indexOf("address") !== -1 || k.indexOf("alamat") !== -1) return "school_address";
+  if (k.indexOf("academic_year") !== -1 || k.indexOf("tahun_ajaran") !== -1 || k.indexOf("th_ajaran") !== -1) return "academic_year";
+  if (k === "headmaster" || k.indexOf("kepala_sekolah") !== -1 || k === "kepsek") return "headmaster";
+  if (k.indexOf("headmaster_nip") !== -1 || k.indexOf("nip_kepala") !== -1 || k.indexOf("nik_kepala") !== -1 || k.indexOf("nip_kepsek") !== -1 || k.indexOf("nik_kepsek") !== -1) return "headmaster_nip";
+  if (k === "vice_headmaster" || k.indexOf("wakil_kepala") !== -1 || k === "wakasek" || k.indexOf("kurikulum") !== -1) return "vice_headmaster";
+  if (k.indexOf("vice_headmaster_nip") !== -1 || k.indexOf("nip_wakil") !== -1 || k.indexOf("nik_wakil") !== -1 || k.indexOf("nip_wakasek") !== -1 || k.indexOf("nik_wakasek") !== -1) return "vice_headmaster_nip";
+  if (k.indexOf("vice_headmaster_title") !== -1 || k.indexOf("jabatan") !== -1 || k.indexOf("title") !== -1) return "vice_headmaster_title";
+  if (k.indexOf("logo_url") !== -1 || k.indexOf("school_logo") !== -1 || k === "logo" || k.indexOf("logo_sekolah") !== -1) return "school_logo_url";
+  if (k.indexOf("logo_folder") !== -1 || k.indexOf("folder_logo") !== -1) return "logo_folder_id";
+  
+  return k;
+}
+
+function getSettingsFromSheet() {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName("settings");
+    if (!sheet) {
+      sheet = getOrCreateSheet("settings");
+    }
+
+    var data = sheet.getDataRange().getValues();
+    var settings = {
+      school_name: "${schoolName.trim() || 'SMPIT Pondok Duta'}",
+      foundation_name: "${foundationName.trim() || 'Yayasan Perguruan Islam Pondok Duta'}",
+      npsn: "${npsn.trim() || '20276180'}",
+      school_address: "${schoolAddress.trim() || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}",
+      academic_year: "${academicYear.trim() || '2026/2027'}",
+      headmaster: "${headmaster.trim() || 'H. Sudirman, M.Pd.I'}",
+      headmaster_nip: "${headmasterNip.trim() || '197508152002121003'}",
+      vice_headmaster: "${viceHeadmaster.trim() || 'Drs. H. Ahmad Fauzi, M.Pd'}",
+      vice_headmaster_nip: "${viceHeadmasterNip.trim() || '197805122005011002'}",
+      vice_headmaster_title: "${viceHeadmasterTitle.trim() || 'Tim Kurikulum'}",
+      school_logo_url: "${schoolLogoUrl.trim() || ''}",
+      logo_folder_id: "${logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}"
+    };
+
+    if (data.length <= 1 || (data.length === 1 && !data[0][0])) {
+      saveSettingsToSheet(settings);
+      return settings;
+    }
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var rawKey = String(row[0] || "").trim();
+      var rawVal = row[1];
+      if (!rawKey) continue;
+
+      var normKey = normalizeSettingKey(rawKey);
+      if (normKey && rawVal !== undefined && rawVal !== null) {
+        settings[normKey] = String(rawVal).trim();
+      }
+    }
+
+    return settings;
+  } catch (err) {
+    Logger.log("Error getSettingsFromSheet: " + err.toString());
+    return {
+      school_name: "SMPIT Pondok Duta",
+      headmaster: "H. Sudirman, M.Pd.I",
+      vice_headmaster: "Drs. H. Ahmad Fauzi, M.Pd",
+      vice_headmaster_title: "Tim Kurikulum",
+      logo_folder_id: "1tFn4GYU5d231gJgqXSphAAGlyueOkljJ"
+    };
+  }
+}
+
+function saveSettingsToSheet(settingsData) {
+  try {
+    if (!settingsData || typeof settingsData !== "object") {
+      return { success: false, message: "Data pengaturan tidak valid." };
+    }
+
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName("settings");
+    if (!sheet) {
+      sheet = ss.insertSheet("settings");
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow === 0) {
+      sheet.appendRow(["Pengaturan (Key)", "Nilai (Value)", "Keterangan"]);
+      sheet.getRange("A1:C1").setFontWeight("bold").setBackground("#e2e8f0");
+    }
+
+    var currentData = sheet.getDataRange().getValues();
+    var existingRowMap = {};
+    for (var r = 1; r < currentData.length; r++) {
+      var k = normalizeSettingKey(String(currentData[r][0] || "").trim());
+      if (k) existingRowMap[k] = r + 1;
+    }
+
+    var descriptions = {
+      school_name: "Nama Satuan Pendidikan",
+      foundation_name: "Nama Yayasan (Kop Surat Baris 1)",
+      npsn: "Nomor Pokok Sekolah Nasional",
+      school_address: "Alamat Lengkap Satuan Pendidikan",
+      academic_year: "Tahun Ajaran Aktif",
+      headmaster: "Nama Lengkap & Gelar Kepala Sekolah (Tanda Tangan Kiri)",
+      headmaster_nip: "NIK / NIP Kepala Sekolah",
+      vice_headmaster: "Nama Lengkap & Gelar Wakil Kepala Sekolah (Tanda Tangan Kanan)",
+      vice_headmaster_nip: "NIK / NIP Wakil Kepala Sekolah",
+      vice_headmaster_title: "Jabatan Penandatangan Kanan",
+      school_logo_url: "URL Gambar Logo Sekolah (Google Drive / Online)",
+      logo_folder_id: "ID Folder Google Drive Tempat Logo Disimpan"
+    };
+
+    var keys = Object.keys(settingsData);
+    for (var j = 0; j < keys.length; j++) {
+      var origKey = keys[j];
+      var keyNorm = normalizeSettingKey(origKey);
+      var val = settingsData[origKey];
+      if (val === undefined || val === null) continue;
+      val = String(val).trim();
+
+      if (existingRowMap[keyNorm]) {
+        sheet.getRange(existingRowMap[keyNorm], 2).setValue(val);
+      } else {
+        var desc = descriptions[keyNorm] || "";
+        sheet.appendRow([origKey, val, desc]);
+        existingRowMap[keyNorm] = sheet.getLastRow();
+      }
+    }
+
+    return {
+      success: true,
+      message: "Data profil pimpinan, penandatangan, dan logo berhasil disimpan di database sheet 'settings'!",
+      data: settingsData
+    };
+  } catch (err) {
+    Logger.log("Error saveSettingsToSheet: " + err.toString());
+    return { success: false, message: "Gagal menyimpan ke sheet 'settings': " + err.toString() };
+  }
+}
+
+function uploadLogoToDrive(fileData, targetFolderId) {
+  try {
+    if (!fileData || !fileData.data) {
+      return { success: false, message: "Data gambar logo kosong atau tidak terbaca." };
+    }
+
+    var folderId = (targetFolderId || "1tFn4GYU5d231gJgqXSphAAGlyueOkljJ").toString().trim();
+    var folder = null;
+
+    try {
+      folder = DriveApp.getFolderById(folderId);
+    } catch (eFolder) {
+      Logger.log("Drive folder ID tidak ditemukan, fallback ke root: " + eFolder.toString());
+      try {
+        folder = DriveApp.getRootFolder();
+      } catch (eRoot) {
+        folder = null;
+      }
+    }
+
+    var rawData = fileData.data;
+    var contentType = "image/png";
+    var base64String = rawData;
+
+    if (rawData.indexOf(";base64,") !== -1) {
+      var parts = rawData.split(";base64,");
+      contentType = parts[0].replace("data:", "") || "image/png";
+      base64String = parts[1];
+    }
+
+    var decodedBytes = Utilities.base64Decode(base64String);
+    var originalName = fileData.name || "logo_sekolah.png";
+    var ext = ".png";
+    if (originalName.lastIndexOf(".") !== -1) {
+      ext = originalName.substring(originalName.lastIndexOf("."));
+    }
+    var cleanFileName = "Logo_SMPIT_Pondok_Duta_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss") + ext;
+    var blob = Utilities.newBlob(decodedBytes, contentType, cleanFileName);
+
+    var file = folder ? folder.createFile(blob) : DriveApp.createFile(blob);
+
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (eShare) {
+      Logger.log("Notice sharing: " + eShare.toString());
+    }
+
+    var fileId = file.getId();
+    var directLogoUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+    var driveViewUrl = file.getUrl();
+
+    // Simpan langsung ke sheet "settings"
+    saveSettingsToSheet({
+      school_logo_url: directLogoUrl,
+      logo_folder_id: folderId
+    });
+
+    return {
+      success: true,
+      fileId: fileId,
+      fileUrl: directLogoUrl,
+      driveUrl: driveViewUrl,
+      fileName: cleanFileName,
+      folderId: folderId,
+      message: "Logo berhasil disimpan di Google Drive (Folder: " + folderId + ") & database sheet 'settings'!"
+    };
+  } catch (err) {
+    Logger.log("Error uploadLogoToDrive: " + err.toString());
+    return { success: false, message: "Gagal mengunggah logo ke Google Drive: " + err.toString() };
   }
 }
 
@@ -1083,6 +1465,25 @@ function deleteUsulanFromSheet(rowIndex) {
 
                 {/* Actions & URL Input */}
                 <div className="flex-1 space-y-3">
+                  <div className="p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-indigo-950 font-semibold">
+                      <FolderOpen className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span>Folder Google Drive Logo:</span>
+                      <code className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono text-[10px]">
+                        {logoFolderId || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}
+                      </code>
+                    </div>
+                    <a
+                      href={`https://drive.google.com/drive/folders/${logoFolderId || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-700 hover:text-indigo-900 font-bold hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Buka Folder Drive</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
                   <div className="flex flex-wrap items-center gap-2.5">
                     <input
                       type="file"
@@ -1093,11 +1494,21 @@ function deleteUsulanFromSheet(rowIndex) {
                     />
                     <button
                       type="button"
+                      disabled={isUploadingLogo}
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition cursor-pointer"
                     >
-                      <Upload className="w-4 h-4" />
-                      <span>Unggah File Logo Baru (PNG/JPG/SVG)</span>
+                      {isUploadingLogo ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Mengunggah Logo ke Drive &amp; Sheet settings...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Unggah File Logo Baru (PNG/JPG/SVG)</span>
+                        </>
+                      )}
                     </button>
 
                     {schoolLogoUrl && (
@@ -1121,7 +1532,7 @@ function deleteUsulanFromSheet(rowIndex) {
                         type="text"
                         value={logoUrlInput}
                         onChange={(e) => setLogoUrlInput(e.target.value)}
-                        placeholder="https://domain-sekolah.sch.id/logo.png"
+                        placeholder="https://domain-sekolah.sch.id/logo.png atau link Drive"
                         className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-[11px] focus:border-indigo-600 outline-none bg-white"
                       />
                       <button
@@ -1135,7 +1546,7 @@ function deleteUsulanFromSheet(rowIndex) {
                   </div>
 
                   <p className="text-[11px] text-slate-500">
-                    * Logo yang diunggah akan otomatis ditampilkan pada Kop Surat Lembar Unduhan Laporan PDF dan pada bilah navigasi atas portal.
+                    * Berkas logo otomatis diunggah ke Google Drive (Folder <code>1tFn4GYU5d231gJgqXSphAAGlyueOkljJ</code>) dan link gambar disimpan di database sheet <code>settings</code> sehingga otomatis tersinkron dan tampil di semua perangkat lain &amp; lembar unduh PDF.
                   </p>
                 </div>
               </div>
@@ -1346,18 +1757,40 @@ function deleteUsulanFromSheet(rowIndex) {
                 </button>
               )}
 
-              <div className="flex items-center gap-3 ml-auto">
+              <div className="flex flex-wrap items-center gap-2.5 ml-auto">
+                <button
+                  type="button"
+                  onClick={handleFetchSettingsFromSheet}
+                  disabled={isSyncing}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 disabled:opacity-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                  title="Tarik data profil pimpinan dan logo langsung dari sheet 'settings' Google Spreadsheet"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Menarik...' : 'Tarik dari Sheet "settings"'}</span>
+                </button>
+
                 {identitySaved && (
                   <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4" /> Tersimpan!
+                    <CheckCircle className="w-4 h-4" /> Tersimpan ke Sheet "settings"!
                   </span>
                 )}
+
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition cursor-pointer"
+                  disabled={isSavingSettings}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Simpan &amp; Sinkronkan ke Laporan</span>
+                  {isSavingSettings ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Menyimpan ke Sheet "settings"...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Simpan &amp; Sinkronisasi ke Laporan</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1404,10 +1837,20 @@ function deleteUsulanFromSheet(rowIndex) {
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-1 md:col-span-2">
+              <div className="p-3.5 rounded-2xl bg-teal-50 border border-slate-200/90 space-y-1">
                 <span className="font-extrabold text-teal-900 block">Sheet &ldquo;Academic Year&rdquo;</span>
                 <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
                   Kolom: A: No | B: Academic Year | C: Folder ID (Lampiran) | D: Folder Perangkat (Perangkat Pembelajaran)
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/90 space-y-1">
+                <span className="font-extrabold text-indigo-900 block">Sheet &ldquo;settings&rdquo; (Profil &amp; Logo)</span>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                  Kolom: A: Pengaturan (Key) | B: Nilai (Value) | C: Keterangan
+                </p>
+                <p className="text-[10px] text-indigo-700 font-medium mt-0.5">
+                  Menyimpan otomatis profil pimpinan, penandatangan, dan tautan logo Google Drive.
                 </p>
               </div>
             </div>
@@ -1417,7 +1860,7 @@ function deleteUsulanFromSheet(rowIndex) {
           <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
             <h3 className="font-black text-slate-900 text-sm flex items-center gap-2">
               <Sliders className="w-4 h-4 text-blue-600" />
-              <span>Pengaturan URL & ID Spreadsheet</span>
+              <span>Pengaturan URL &amp; ID Spreadsheet</span>
             </h3>
 
             <form onSubmit={handleSaveAllConfig} className="space-y-3 text-xs">
@@ -1446,6 +1889,32 @@ function deleteUsulanFromSheet(rowIndex) {
                   placeholder="https://script.google.com/macros/s/.../exec"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-mono text-[11px] focus:border-blue-600 outline-none"
                   required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">
+                    Folder ID Google Drive (Logo Sekolah)
+                  </label>
+                  {logoFolderId && (
+                    <a
+                      href={`https://drive.google.com/drive/folders/${logoFolderId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <FolderOpen className="w-3 h-3" />
+                      Buka Drive
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={logoFolderId}
+                  onChange={(e) => setLogoFolderId(e.target.value)}
+                  placeholder="1tFn4GYU5d231gJgqXSphAAGlyueOkljJ"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-[11px] focus:border-indigo-600 outline-none"
                 />
               </div>
 
@@ -1550,8 +2019,19 @@ function deleteUsulanFromSheet(rowIndex) {
           </button>
         </div>
 
+        {/* Notice of new capabilities */}
+        <div className="p-4 bg-emerald-950/60 rounded-2xl border border-emerald-500/40 text-xs text-emerald-200 space-y-1">
+          <div className="flex items-center gap-2 font-bold text-emerald-300">
+            <CheckCircle className="w-4 h-4 text-emerald-400" />
+            <span>Pembaruan Backend: Dukungan Penuh Sheet &ldquo;settings&rdquo; &amp; Folder Logo Drive</span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-emerald-200/90">
+            Skrip Code.gs di bawah ini sudah diperbarui dengan fungsi <code>getSettings</code>, <code>saveSettings</code>, dan <code>uploadLogo</code> yang otomatis menyimpan profil pimpinan ke sheet <code>settings</code> dan mengunggah berkas logo ke folder Google Drive: <code className="bg-emerald-900/60 text-white px-1.5 py-0.5 rounded font-mono">1tFn4GYU5d231gJgqXSphAAGlyueOkljJ</code>.
+          </p>
+        </div>
+
         <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-xs text-slate-300 space-y-2">
-          <p className="font-bold text-sky-400">Cara Menerapkan Skrip & Mengatasi &ldquo;Akses Ditolak: DriveApp&rdquo;:</p>
+          <p className="font-bold text-sky-400">Cara Menerapkan Skrip &amp; Mengatasi &ldquo;Akses Ditolak: DriveApp&rdquo;:</p>
           <ol className="list-decimal pl-5 space-y-1.5 text-[11px] text-slate-300 leading-relaxed">
             <li>Buka spreadsheet Anda &gt; Klik menu <strong>Ekstensi &gt; Apps Script</strong>.</li>
             <li>Salin kode di bawah ini lalu <strong>timpa seluruh isi file <code>Code.gs</code></strong> dan simpan (Ctrl+S).</li>

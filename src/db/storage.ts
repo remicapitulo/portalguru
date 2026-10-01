@@ -89,7 +89,8 @@ class FlexibleDatabaseService {
             vice_headmaster_nip: parsed.config.vice_headmaster_nip || '197805122005011002',
             vice_headmaster_title: (!parsed.config.vice_headmaster_title || parsed.config.vice_headmaster_title.includes('Administrasi'))
               ? 'Tim Kurikulum'
-              : parsed.config.vice_headmaster_title
+              : parsed.config.vice_headmaster_title,
+            logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'
           };
 
           if (needsResave) {

@@ -92,6 +92,7 @@ export interface SchoolConfig {
   school_address: string;
   npsn: string;
   school_logo_url?: string;
+  logo_folder_id?: string;
   drive_folder_name?: string;
   drive_folder_id?: string;
   drive_folder_perangkat_id?: string;

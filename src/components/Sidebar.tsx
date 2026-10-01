@@ -35,6 +35,8 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   role?: string;
   onLogout: () => void;
+  logoUrl?: string;
+  schoolName?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -46,6 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   role = 'Guru',
   onLogout,
+  logoUrl,
+  schoolName,
 }) => {
   const menuItems: {
     id: NavItem;
@@ -138,17 +142,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Centered Logo in Minimize Mode (No squishing, no cut-off) */
             <button
               onClick={onToggleCollapse}
-              className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95 transition-all"
+              className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25 hover:scale-105 active:scale-95 transition-all overflow-hidden p-1"
               title="Perlebar Menu Sidebar"
             >
-              <GraduationCap className="w-5 h-5 shrink-0" />
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-contain rounded-xl bg-white p-0.5" />
+              ) : (
+                <GraduationCap className="w-5 h-5 shrink-0" />
+              )}
             </button>
           ) : (
             /* Expanded Mode */
             <>
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25 shrink-0">
-                  <GraduationCap className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25 shrink-0 overflow-hidden p-1">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-contain rounded-xl bg-white p-0.5" />
+                  ) : (
+                    <GraduationCap className="w-5 h-5" />
+                  )}
                 </div>
 
                 <div className="flex flex-col truncate">
@@ -156,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     AdminGuru
                   </span>
                   <span className="text-[11px] text-sky-300/80 font-medium truncate">
-                    SMPIT Pondok Duta
+                    {schoolName || 'SMPIT Pondok Duta'}
                   </span>
                 </div>
               </div>

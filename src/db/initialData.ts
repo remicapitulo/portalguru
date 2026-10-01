@@ -13,6 +13,7 @@ export const initialConfig: SchoolConfig = {
   school_address: 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat',
   npsn: '20276180',
   school_logo_url: '',
+  logo_folder_id: '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
   spreadsheet_id: '1fmApuBRDQ2cNFEqtsj9g169WvwoccXjZJSEBLtftKwc',
   apps_script_url: 'https://script.google.com/macros/s/AKfycby599LImP-J6RkN-zYc77G1MhqYFtCz8-GfzT_8zi8vUVXIkSFs2A6KhI5B7obT9Ft2/exec',
   drive_folder_id: '1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS',

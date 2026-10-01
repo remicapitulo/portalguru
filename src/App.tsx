@@ -68,6 +68,8 @@ export default function App() {
         onToggleCollapse={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
         role={currentUser?.role}
         onLogout={handleLogout}
+        logoUrl={db.config.school_logo_url}
+        schoolName={db.config.school_name}
       />
 
       {/* Main Right Column: Topbar + Dynamic Page Content + Footer */}

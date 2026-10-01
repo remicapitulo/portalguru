@@ -98,19 +98,72 @@ class GoogleSpreadsheetService {
     }
   }
 
-  // 5. Complete Sync: Updates Events, Usulan, Perangkat, and Users from Sheet into the DB
+  // 5. Fetch Settings (Pimpinan, Logo, Instansi) from Sheet "settings"
+  public async fetchSettings(): Promise<{
+    success: boolean;
+    data?: Record<string, any>;
+    message?: string;
+  }> {
+    try {
+      const url = `${this.getApiUrl()}?action=getSettings&_t=${Date.now()}`;
+      const res = await fetch(url, { method: 'GET' });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.warn('Live fetchSettings failed, using cached data:', err);
+      return {
+        success: false,
+        message: 'Gagal terhubung ke Google Apps Script: ' + (err.message || String(err)),
+      };
+    }
+  }
+
+  // 6. Complete Sync: Updates Events, Usulan, Perangkat, Users, and Settings from Sheet into the DB
   public async syncAll(): Promise<{ success: boolean; message: string }> {
     try {
       dbService.updateSyncStatus('syncing');
 
-      const [eventsRes, usulanRes, usersRes, perangkatRes] = await Promise.all([
+      const [eventsRes, usulanRes, usersRes, perangkatRes, settingsRes] = await Promise.all([
         this.fetchEvents(),
         this.fetchUsulan(),
         this.fetchUsers(),
-        this.fetchPerangkat()
+        this.fetchPerangkat(),
+        this.fetchSettings(),
       ]);
 
       let hasSuccess = false;
+
+      // Sync Settings from Sheet "settings" (or attached inside eventsRes)
+      const settingsObj =
+        settingsRes.success && settingsRes.data && typeof settingsRes.data === 'object'
+          ? settingsRes.data
+          : (eventsRes as any)?.settings && typeof (eventsRes as any).settings === 'object'
+          ? (eventsRes as any).settings
+          : null;
+
+      if (settingsObj) {
+        const s = settingsObj;
+        const configUpdates: any = {};
+        if (s.school_name) configUpdates.school_name = String(s.school_name).trim();
+        if (s.foundation_name) configUpdates.foundation_name = String(s.foundation_name).trim();
+        if (s.npsn) configUpdates.npsn = String(s.npsn).trim();
+        if (s.school_address) configUpdates.school_address = String(s.school_address).trim();
+        if (s.academic_year) configUpdates.academic_year = String(s.academic_year).trim();
+        if (s.headmaster) configUpdates.headmaster = String(s.headmaster).trim();
+        if (s.headmaster_nip) configUpdates.headmaster_nip = String(s.headmaster_nip).trim();
+        if (s.vice_headmaster) configUpdates.vice_headmaster = String(s.vice_headmaster).trim();
+        if (s.vice_headmaster_nip) configUpdates.vice_headmaster_nip = String(s.vice_headmaster_nip).trim();
+        if (s.vice_headmaster_title) configUpdates.vice_headmaster_title = String(s.vice_headmaster_title).trim();
+        if (s.school_logo_url !== undefined && s.school_logo_url !== null) {
+          configUpdates.school_logo_url = String(s.school_logo_url).trim();
+        }
+        if (s.logo_folder_id) configUpdates.logo_folder_id = String(s.logo_folder_id).trim();
+
+        if (Object.keys(configUpdates).length > 0) {
+          dbService.updateConfig(configUpdates);
+          hasSuccess = true;
+        }
+      }
 
       // Sync Users from Sheet "user" ONLY IF valid rows exist (never wipe with empty or corrupt rows)
       if (usersRes.success && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
@@ -489,6 +542,93 @@ class GoogleSpreadsheetService {
     } catch (err: any) {
       console.warn('deletePerangkat failed:', err);
       return { success: false, message: 'Koneksi error: ' + (err.message || String(err)) };
+    }
+  }
+
+  // 14. Save Settings to Sheet "settings"
+  public async saveSettings(settingsData: Record<string, any>): Promise<{
+    success: boolean;
+    data?: Record<string, any>;
+    message: string;
+  }> {
+    try {
+      // Immediately reflect updates in local database state
+      dbService.updateConfig(settingsData);
+
+      const res = await fetch(this.getApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'saveSettings',
+          settingsData,
+        }),
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (data.data) {
+          dbService.updateConfig(data.data);
+        }
+        return {
+          success: true,
+          data: data.data || settingsData,
+          message: data.message || 'Pengaturan pimpinan & logo berhasil disimpan ke sheet "settings"!',
+        };
+      }
+      return {
+        success: false,
+        message: data?.message || 'Gagal menyimpan pengaturan ke database spreadsheet.',
+      };
+    } catch (err: any) {
+      console.warn('saveSettings failed:', err);
+      return { success: false, message: 'Koneksi error: ' + (err.message || String(err)) };
+    }
+  }
+
+  // 15. Upload Logo to Google Drive Folder (1tFn4GYU5d231gJgqXSphAAGlyueOkljJ) & save to Sheet "settings"
+  public async uploadLogo(
+    fileData: { name: string; data: string },
+    customFolderId?: string
+  ): Promise<{
+    success: boolean;
+    fileUrl?: string;
+    fileId?: string;
+    driveUrl?: string;
+    fileName?: string;
+    message: string;
+  }> {
+    try {
+      const folder_id = customFolderId?.trim() || dbService.getConfig().logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ';
+      const res = await fetch(this.getApiUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'uploadLogo',
+          fileData,
+          folder_id,
+        }),
+      });
+      const data = await res.json();
+      if (data && data.success && data.fileUrl) {
+        dbService.updateConfig({
+          school_logo_url: data.fileUrl,
+          logo_folder_id: folder_id
+        });
+        return {
+          success: true,
+          fileUrl: data.fileUrl,
+          fileId: data.fileId,
+          driveUrl: data.driveUrl,
+          fileName: data.fileName,
+          message: data.message || 'Logo berhasil disimpan ke Google Drive (Folder: ' + folder_id + ') & sheet "settings"!'
+        };
+      }
+      return {
+        success: false,
+        message: data?.message || 'Gagal mengunggah logo ke Google Drive.'
+      };
+    } catch (err: any) {
+      console.warn('uploadLogo failed:', err);
+      return { success: false, message: 'Gagal mengunggah logo ke Google Drive: ' + (err.message || String(err)) };
     }
   }
 }
