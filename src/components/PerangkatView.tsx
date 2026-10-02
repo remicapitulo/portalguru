@@ -647,9 +647,11 @@ export const PerangkatView: React.FC<PerangkatViewProps> = ({
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3.5 py-2 bg-blue-50 rounded-2xl border border-blue-100 text-blue-900 text-xs font-bold">
-              <span>{activeTeacher?.nama}</span>
-              <span className="text-blue-600 font-normal">({activeTeacher?.mapel})</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-blue-50/90 rounded-xl sm:rounded-2xl border border-blue-200/70 text-blue-950 text-xs font-bold min-w-0">
+              <span className="truncate">{activeTeacher?.nama}</span>
+              {activeTeacher?.mapel && (
+                <span className="text-blue-600 font-medium truncate shrink-0">({activeTeacher?.mapel})</span>
+              )}
             </div>
           )}
 
@@ -681,73 +683,97 @@ export const PerangkatView: React.FC<PerangkatViewProps> = ({
 
       {/* OVERALL TEACHER PROGRESS CARD */}
       {activeTeacher && (
-        <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-xs space-y-3.5 sm:space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider block">
                 Kelengkapan Administrasi Guru
               </span>
-              <h2 className="text-lg font-black text-slate-900 mt-0.5">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 mt-0.5 truncate" title={activeTeacher.nama}>
                 {activeTeacher.nama}
               </h2>
-              <p className="text-xs text-slate-500">
-                NIK: {activeTeacher.nip} • Mapel: {activeTeacher.mapel || 'Guru Mata Pelajaran'} • TA: {config.academic_year}
-              </p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-xs text-slate-500">
+                <span className="font-mono text-slate-600 font-semibold">NIK: {activeTeacher.nip}</span>
+                <span className="text-slate-300">•</span>
+                <span className="font-medium text-slate-700">{activeTeacher.mapel || 'Guru Mata Pelajaran'}</span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-500">TA {config.academic_year}</span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-              <div className="text-right">
-                <span className="text-[11px] font-bold text-slate-500 block">Status Matriks</span>
-                <span className="text-xs font-extrabold text-blue-700">
-                  {progress.filledSlots} dari 36 Kategori Terisi
-                </span>
+            {/* Status Matriks Box (Optimized for Mobile & Desktop) */}
+            <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 bg-slate-50/90 p-3 sm:p-3.5 rounded-2xl border border-slate-200/70">
+              <div className="text-left sm:text-right min-w-0">
+                <div className="flex items-center gap-1.5 sm:justify-end">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
+                  <span className="text-[10.5px] sm:text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                    Status Matriks
+                  </span>
+                </div>
+                <div className="mt-0.5 whitespace-nowrap">
+                  <strong className="text-sm sm:text-base font-black text-blue-950">
+                    {progress.filledSlots}
+                  </strong>
+                  <span className="text-xs font-bold text-slate-500 ml-1">
+                    dari 36 Kategori Terisi
+                  </span>
+                </div>
               </div>
+
               <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black text-base shadow-xs ${
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex flex-col items-center justify-center text-white font-black shadow-xs shrink-0 transition-transform active:scale-95 ${
                   progress.percentage >= 80
-                    ? 'bg-emerald-500'
+                    ? 'bg-emerald-600 shadow-emerald-500/20'
                     : progress.percentage >= 50
-                    ? 'bg-amber-500'
-                    : 'bg-pink-600'
+                    ? 'bg-amber-500 shadow-amber-500/20'
+                    : 'bg-rose-500 shadow-rose-500/20'
                 }`}
               >
-                {progress.percentage}%
+                <span className="text-sm sm:text-base leading-none">{progress.percentage}%</span>
+                <span className="text-[9px] font-bold text-white/90 mt-0.5 uppercase tracking-tighter">
+                  {progress.percentage >= 100 ? 'Lengkap' : 'Proses'}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-full h-2.5 sm:h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/50">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
                 progress.percentage >= 80
-                  ? 'bg-emerald-500'
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
                   : progress.percentage >= 50
-                  ? 'bg-amber-500'
-                  : 'bg-pink-500'
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                  : 'bg-gradient-to-r from-rose-500 to-pink-500'
               }`}
-              style={{ width: `${progress.percentage}%` }}
+              style={{ width: `${Math.min(progress.percentage, 100)}%` }}
             />
           </div>
 
-          {/* Breakdown per Document Type */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-4 border-t border-slate-100">
+          {/* Breakdown per Document Type (3 columns on mobile = exactly 2 neat rows) */}
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 pt-3 sm:pt-4 border-t border-slate-100">
             {DOC_TYPES.map((dt) => {
               const count = progress.breakdown[dt] || 0;
               const isFull = count >= 6;
               return (
                 <div
                   key={dt}
-                  className={`p-3 rounded-2xl border text-center transition ${
-                    isFull ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200/80'
+                  className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl border text-center transition ${
+                    isFull
+                      ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 shadow-2xs'
+                      : 'bg-slate-50 border-slate-200/80 text-slate-800'
                   }`}
                 >
-                  <span className="text-[11px] font-bold block text-slate-600">{dt}</span>
-                  <span className={`text-base font-black ${isFull ? 'text-emerald-700' : 'text-slate-800'}`}>
-                    {count}/6
-                  </span>
-                  <span className="block text-[10px] text-slate-400 mt-0.5">
-                    {isFull ? 'Tuntas' : 'Sebagian'}
+                  <span className="text-[10px] sm:text-[11px] font-bold block text-slate-600 truncate">{dt}</span>
+                  <div className="flex items-center justify-center gap-1 mt-0.5">
+                    <span className={`text-xs sm:text-base font-black ${isFull ? 'text-emerald-700' : 'text-slate-800'}`}>
+                      {count}/6
+                    </span>
+                    {isFull && <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />}
+                  </div>
+                  <span className={`block text-[9px] sm:text-[10px] font-semibold mt-0.5 ${isFull ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    {isFull ? 'Tuntas' : `${6 - count} Kurang`}
                   </span>
                 </div>
               );

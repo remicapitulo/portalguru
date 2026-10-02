@@ -126,8 +126,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               {currentUser.avatar || currentUser.nama.charAt(0).toUpperCase()}
             </div>
 
-            <div className="hidden sm:flex flex-col text-left pr-1 max-w-[150px] lg:max-w-[200px]">
-              <span className="text-xs font-bold text-slate-900 leading-tight truncate">
+            <div className="hidden sm:flex flex-col text-left pr-1 max-w-[180px] lg:max-w-[260px]">
+              <span className="text-xs font-bold text-slate-900 leading-tight truncate" title={currentUser.nama}>
                 {currentUser.nama}
               </span>
               <span className="text-[10px] text-slate-500 font-medium truncate">

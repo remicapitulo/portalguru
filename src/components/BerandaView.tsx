@@ -69,6 +69,12 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
 
   const totalBerkas = db.uploadRecords ? db.uploadRecords.length : 0;
 
+  // Calculate specific progress for the currently logged-in user
+  const currentUserProgress = useMemo(() => {
+    if (!currentUser?.nip && !currentUser?.id) return null;
+    return dbService.calculateTeacherProgress(currentUser.nip || currentUser.id);
+  }, [currentUser, db.uploadRecords]);
+
   // Dates & Event Filtering
   const today = useMemo(() => {
     const d = new Date();
@@ -237,42 +243,133 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12">
       {/* HERO SECTION */}
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-linear-to-r from-blue-900 via-blue-950 to-teal-950 text-white p-5 sm:p-7 lg:p-10 shadow-xl border border-blue-900/40">
-        {/* Ambient background circles */}
-        <div className="absolute -right-12 -top-12 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute right-1/4 -bottom-16 w-64 h-64 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-linear-to-r from-blue-900 via-indigo-950 to-slate-950 text-white p-5 sm:p-7 lg:p-9 shadow-xl border border-blue-800/40">
+        {/* Ambient background accents */}
+        <div className="absolute -right-16 -top-16 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute right-1/3 -bottom-16 w-72 h-72 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs text-sky-200 font-semibold mb-3 sm:mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Tahun Akademik Aktif: <strong>{config.academic_year}</strong></span>
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6 lg:gap-8">
+          {/* Main Greeting & Identity Details */}
+          <div className="max-w-2xl space-y-3.5 sm:space-y-4 min-w-0 flex-1">
+            {/* Header badges: Portal Tag & Academic Year */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-sky-200 border border-blue-400/30 text-[11px] sm:text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                <span>Portal Administrasi Guru</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-slate-200 border border-white/15 text-[11px] sm:text-xs font-medium">
+                <Calendar className="w-3.5 h-3.5 text-teal-300 shrink-0" />
+                <span>TA {config.academic_year}</span>
+              </span>
+            </div>
+
+            {/* Respectful Greeting & Prominent Teacher Name */}
+            <div>
+              <p className="text-xs sm:text-sm font-bold tracking-wider text-sky-300/90 uppercase mb-1">
+                Selamat Datang,
+              </p>
+              <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight text-balance">
+                {currentUser ? currentUser.nama : 'Bapak/Ibu Pendidik'}
+              </h1>
+            </div>
+
+            {/* Profile Identity Badges: Role, Mapel, NIK */}
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              {currentUser?.role && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 border border-white/15 text-[11px] sm:text-xs text-slate-200 font-semibold backdrop-blur-xs">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>{currentUser.role}</span>
+                </span>
+              )}
+              {currentUser?.mapel && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 border border-white/15 text-[11px] sm:text-xs text-slate-200 font-semibold backdrop-blur-xs">
+                  <BookOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                  <span>Mapel: <strong className="text-white font-bold">{currentUser.mapel}</strong></span>
+                </span>
+              )}
+              {currentUser?.nip && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/10 border border-white/15 text-[11px] sm:text-xs text-slate-300 font-mono backdrop-blur-xs">
+                  <span className="text-slate-400 font-sans">NIK:</span>
+                  <span className="text-slate-200 font-bold">{currentUser.nip}</span>
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed font-normal max-w-xl">
+              Pusat kendali mandiri berkas perangkat kurikulum merdeka, jurnal KBM harian, dan agenda sekolah secara teratur, tertib, dan transparan.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-1">
+              <button
+                onClick={() => onNavigate('perangkat')}
+                className="px-5 py-2.5 rounded-xl bg-white text-blue-950 hover:bg-sky-50 font-bold text-xs lg:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-[44px]"
+              >
+                <FileCheck2 className="w-4 h-4 text-blue-700 shrink-0" />
+                <span>Kelola Perangkat Pembelajaran</span>
+              </button>
+
+              <a
+                href="#panel-menu-section"
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs lg:text-sm backdrop-blur-xs border border-white/20 transition-all flex items-center justify-center gap-2 text-center active:scale-95 min-h-[44px]"
+              >
+                <Layers className="w-4 h-4 text-sky-300 shrink-0" />
+                <span>Buka Panel Menu</span>
+              </a>
+            </div>
           </div>
 
-          <h1 className="text-xl sm:text-2xl lg:text-4xl font-black tracking-tight leading-snug sm:leading-tight text-white mb-2">
-            Selamat Datang, {currentUser ? currentUser.nama : 'Bapak/Ibu Guru'}
-          </h1>
+          {/* Right Column: Teacher Identity Card (Desktop & Large Screens) */}
+          {currentUser && (
+            <div className="hidden lg:flex flex-col w-72 shrink-0 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4.5 shadow-lg text-white space-y-3">
+              <div className="flex items-center gap-3 pb-3 border-b border-white/15">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-black text-lg shadow-md ring-2 ring-white/30 shrink-0">
+                  {currentUser.avatar || currentUser.nama.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-sky-300 block">
+                    Status Pendidik
+                  </span>
+                  <h3 className="text-xs font-bold text-white truncate" title={currentUser.nama}>
+                    {currentUser.nama}
+                  </h3>
+                  <span className="text-[11px] text-slate-300 truncate block">
+                    {currentUser.role} {currentUser.mapel ? `• ${currentUser.mapel}` : ''}
+                  </span>
+                </div>
+              </div>
 
-          <p className="text-xs sm:text-sm lg:text-base text-slate-200 leading-relaxed mb-5 sm:mb-6 font-normal">
-            Pusat kendali dan akses cepat berkas jurnal mengajar, perangkat kurikulum merdeka, kalender akademik, dan administrasi sekolah secara mandiri, teratur, dan efisien.
-          </p>
+              {/* Progress Summary if teacher progress exists */}
+              {currentUserProgress && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300 text-[11px]">Kelengkapan Berkas</span>
+                    <span className="font-bold text-sky-300">{currentUserProgress.percentage}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/15 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-teal-400 to-emerald-400 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(currentUserProgress.percentage, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-300">
+                    <span>{currentUserProgress.filledSlots} / 36 Terisi</span>
+                    <span className="font-semibold text-emerald-300">
+                      {currentUserProgress.percentage >= 100 ? '✓ Lengkap' : 'Dalam Proses'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
-            <button
-              onClick={() => onNavigate('perangkat')}
-              className="px-4 sm:px-5 py-2.5 rounded-xl bg-white text-blue-950 hover:bg-sky-50 font-bold text-xs lg:text-sm shadow-lg shadow-black/10 hover:-translate-y-0.5 transition flex items-center justify-center gap-2"
-            >
-              <FileCheck2 className="w-4 h-4 text-blue-700 shrink-0" />
-              <span>Kelola Perangkat Pembelajaran</span>
-            </button>
-
-            <a
-              href="#panel-menu-section"
-              className="px-4 sm:px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs lg:text-sm backdrop-blur-xs border border-white/20 transition flex items-center justify-center gap-2 text-center"
-            >
-              <Layers className="w-4 h-4 text-sky-300 shrink-0" />
-              <span>Buka Panel Menu</span>
-            </a>
-          </div>
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-300">
+                <span className="flex items-center gap-1.5 font-medium text-emerald-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Pendidik Aktif
+                </span>
+                <span className="font-mono text-slate-300">NIK: {currentUser.nip}</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
