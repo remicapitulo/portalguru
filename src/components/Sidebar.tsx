@@ -13,7 +13,9 @@ import {
   LogOut,
   X,
   GraduationCap,
-  ChevronLeft
+  ChevronLeft,
+  Award,
+  Share2
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -25,6 +27,16 @@ export type NavItem =
   | 'jurnal'
   | 'data-guru'
   | 'db-manager';
+
+interface MenuItemConfig {
+  id?: NavItem;
+  label: string;
+  shortLabel: string;
+  icon: React.ReactNode;
+  externalUrl?: string;
+  badge?: string;
+  badgeColor?: string;
+}
 
 interface SidebarProps {
   currentTab: NavItem;
@@ -51,14 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   logoUrl,
   schoolName,
 }) => {
-  const menuItems: {
-    id: NavItem;
-    label: string;
-    shortLabel: string;
-    icon: React.ReactNode;
-    badge?: string;
-    badgeColor?: string;
-  }[] = [
+  const menuItems: MenuItemConfig[] = [
     {
       id: 'beranda',
       label: 'Beranda Portal',
@@ -90,6 +95,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Jurnal Mengajar Harian',
       shortLabel: 'Jurnal',
       icon: <BookOpenCheck className="w-5 h-5 text-teal-400 shrink-0" />,
+    },
+    {
+      label: 'Penilaian Antar Rekan',
+      shortLabel: 'Penilaian',
+      icon: <Award className="w-5 h-5 text-purple-400 shrink-0" />,
+      externalUrl: 'https://forms.gle/oWbXrJX3VncVWLDe9',
+      badge: 'Form',
+      badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    },
+    {
+      label: 'Update Eflayer Sosmed',
+      shortLabel: 'Eflayer',
+      icon: <Share2 className="w-5 h-5 text-fuchsia-400 shrink-0" />,
+      externalUrl: 'https://forms.gle/5SeuC8XTp6SzWoBo9',
+      badge: 'Sosmed',
+      badgeColor: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
     },
     {
       id: 'data-guru',
@@ -221,17 +242,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {visibleMenuItems.map((item) => {
-            const isActive = currentTab === item.id;
+            const isActive = item.id ? currentTab === item.id : false;
 
             return (
               <button
-                key={item.id}
+                key={item.label}
                 onClick={() => {
-                  onSelectTab(item.id);
+                  if (item.externalUrl) {
+                    window.open(item.externalUrl, '_blank');
+                  } else if (item.id) {
+                    onSelectTab(item.id);
+                  }
                   if (window.innerWidth < 1024) onClose();
                 }}
                 title={showCollapsed ? item.label : undefined}
-                className={`w-full flex items-center rounded-xl text-xs font-semibold transition-all group relative ${
+                className={`w-full flex items-center rounded-xl text-xs font-semibold transition-all group relative cursor-pointer ${
                   showCollapsed
                     ? 'justify-center w-11 h-11 mx-auto p-0'
                     : 'justify-between px-3.5 py-3 gap-2.5'
@@ -252,17 +277,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                 </div>
 
-                {/* Badge (Non-wrapping single line) */}
-                {!showCollapsed && item.badge && (
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0 border ${
-                      isActive
-                        ? 'bg-white/20 text-white border-white/30'
-                        : item.badgeColor || 'bg-white/10 text-slate-300 border-white/10'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
+                {/* Badge & External indicator (Non-wrapping single line) */}
+                {!showCollapsed && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {item.badge && (
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap border ${
+                          isActive
+                            ? 'bg-white/20 text-white border-white/30'
+                            : item.badgeColor || 'bg-white/10 text-slate-300 border-white/10'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.externalUrl && (
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-white shrink-0" />
+                    )}
+                  </div>
                 )}
 
                 {/* Tooltip for collapsed mode on desktop hover */}

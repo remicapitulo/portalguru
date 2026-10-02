@@ -5,20 +5,14 @@ import {
   Clock,
   UserCheck,
   FileText,
-  Search,
-  ArrowRight,
   BookOpen,
-  Compass,
   Lightbulb,
   FileCheck2,
   Users,
   Database,
   FileSpreadsheet,
-  ClipboardList,
-  FolderOpen,
   CalendarCheck,
   Award,
-  Layers,
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
@@ -42,7 +36,6 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
   db,
   onNavigate,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [eventFilterMode, setEventFilterMode] = useState<'h30' | 'all'>('h30');
 
   // Filter out administrator and obtain real teachers
@@ -131,113 +124,11 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
     groupedEvents[monthKey].push(evt);
   });
 
-  // 12 Menu items definition
-  const menuCatalog = [
-    {
-      title: 'Perangkat Pembelajaran',
-      icon: <Compass className="w-6 h-6" />,
-      desc: 'Silabus, Prota, Promes, KKTP, Modul Ajar (36 Kategori semester 1 & 2).',
-      color: '#db2777',
-      tab: 'perangkat' as NavItem,
-    },
-    {
-      title: 'Kalender Pendidikan',
-      icon: <BookOpen className="w-6 h-6" />,
-      desc: 'Tampilan lengkap agenda sekolah, proposal kegiatan, dan timeline Kaldik.',
-      color: '#0284c7',
-      tab: 'kaldik' as NavItem,
-    },
-    {
-      title: 'Suara Guru & Usulan',
-      icon: <Lightbulb className="w-6 h-6" />,
-      desc: 'Wadah aspirasi, pengajuan kebutuhan sarana/fasilitas, dan ide inovatif.',
-      color: '#ea580c',
-      tab: 'usulan' as NavItem,
-    },
-    {
-      title: 'Jurnal Mengajar Harian',
-      icon: <CalendarCheck className="w-6 h-6" />,
-      desc: 'Catat agenda harian, materi ajar, presensi tatap muka, dan refleksi kelas.',
-      color: '#0d9488',
-      tab: 'jurnal' as NavItem,
-    },
-    {
-      title: 'Data Guru & Rekap',
-      icon: <Users className="w-6 h-6" />,
-      desc: 'Daftar guru pengampu, rekapitulasi kelengkapan, dan cetak PDF laporan.',
-      color: '#4f46e5',
-      tab: 'data-guru' as NavItem,
-    },
-    {
-      title: 'Database Spreadsheet',
-      icon: <FileSpreadsheet className="w-6 h-6" />,
-      desc: 'Pusat integrasi Google Sheets, live sync data, dan pengaturan backend.',
-      color: '#059669',
-      tab: 'db-manager' as NavItem,
-    },
-    {
-      title: 'Penilaian Antar Rekan',
-      icon: <Award className="w-6 h-6" />,
-      desc: 'Instrumen evaluasi dan penilaian kinerja objektif antar rekan sejawat.',
-      color: '#7c3aed',
-      externalUrl: 'https://forms.gle/oWbXrJX3VncVWLDe9',
-    },
-    {
-      title: 'Update Eflyer Sosmed',
-      icon: <FolderOpen className="w-6 h-6" />,
-      desc: 'Laporan publikasi materi promosi, agenda dakwah, dan e-flyer sekolah.',
-      color: '#9333ea',
-      externalUrl: 'https://forms.gle/5SeuC8XTp6SzWoBo9',
-    },
-    {
-      title: 'Absensi / Presensi Kelas',
-      icon: <UserCheck className="w-6 h-6" />,
-      desc: 'Pencatatan kehadiran harian siswa di kelas secara tertib dan akurat.',
-      color: '#2563eb',
-      tab: 'jurnal' as NavItem,
-    },
-    {
-      title: 'Bank Soal & Kisi-kisi',
-      icon: <FileText className="w-6 h-6" />,
-      desc: 'Kumpulan arsip master soal ujian formatif/sumatif, kisi-kisi, & rubrik.',
-      color: '#0891b2',
-      tab: 'perangkat' as NavItem,
-    },
-    {
-      title: 'Daftar Nilai Siswa',
-      icon: <ClipboardList className="w-6 h-6" />,
-      desc: 'Lembar entri nilai tugas harian, PTS, PAS, dan kalkulasi nilai akhir.',
-      color: '#d97706',
-      tab: 'perangkat' as NavItem,
-    },
-    {
-      title: 'Arsip & Administrasi Surat',
-      icon: <Layers className="w-6 h-6" />,
-      desc: 'Penyimpanan berkas SK pembagian tugas, sertifikat, & administrasi resmi.',
-      color: '#64748b',
-      tab: 'perangkat' as NavItem,
-    },
-  ];
-
   const isAdmin = Boolean(
     currentUser?.role &&
     (currentUser.role.toLowerCase() === 'admin' ||
      currentUser.role.toLowerCase() === 'administrator' ||
      currentUser.role.toLowerCase().includes('admin'))
-  );
-
-  // Filter: Hide Data Guru & Rekap and Database Spreadsheet from Role: Guru
-  const accessibleMenus = menuCatalog.filter((m) => {
-    if (m.tab === 'data-guru' || m.tab === 'db-manager') {
-      return isAdmin;
-    }
-    return true;
-  });
-
-  const filteredMenus = accessibleMenus.filter(
-    (m) =>
-      m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.desc.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -309,13 +200,13 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
                 <span>Kelola Perangkat Pembelajaran</span>
               </button>
 
-              <a
-                href="#panel-menu-section"
-                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs lg:text-sm backdrop-blur-xs border border-white/20 transition-all flex items-center justify-center gap-2 text-center active:scale-95 min-h-[44px]"
+              <button
+                onClick={() => onNavigate('kaldik')}
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs lg:text-sm backdrop-blur-xs border border-white/20 transition-all flex items-center justify-center gap-2 text-center active:scale-95 min-h-[44px] cursor-pointer"
               >
-                <Layers className="w-4 h-4 text-sky-300 shrink-0" />
-                <span>Buka Panel Menu</span>
-              </a>
+                <Calendar className="w-4 h-4 text-sky-300 shrink-0" />
+                <span>Kalender Pendidikan</span>
+              </button>
             </div>
           </div>
 
@@ -628,76 +519,6 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
               </div>
             ))
           )}
-        </div>
-      </section>
-
-      {/* PANEL MENU ADMINISTRASI (GRID) */}
-      <section id="panel-menu-section" className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-blue-100 text-blue-800">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">Panel Menu Administrasi</h2>
-              <p className="text-xs text-slate-500">Layanan administrasi, dokumen kurikulum, dan agenda sekolah</p>
-            </div>
-          </div>
-
-          {/* Search Box */}
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari layanan administrasi..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white rounded-2xl border border-slate-200 text-xs focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition"
-            />
-          </div>
-        </div>
-
-        {/* Grid cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredMenus.map((item, idx) => {
-            const isExternal = !!item.externalUrl;
-            return (
-              <div
-                key={idx}
-                onClick={() => {
-                  if (item.tab) onNavigate(item.tab);
-                  else if (item.externalUrl) window.open(item.externalUrl, '_blank');
-                }}
-                className="cursor-pointer group bg-white rounded-2xl p-5 border border-slate-200/90 hover:border-blue-300 shadow-xs hover:shadow-lg transition-all flex flex-col justify-between"
-                style={{ borderTopWidth: '4px', borderTopColor: item.color }}
-              >
-                <div>
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-105"
-                    style={{ backgroundColor: `${item.color}15`, color: item.color }}
-                  >
-                    {item.icon}
-                  </div>
-
-                  <h3 className="font-extrabold text-sm text-slate-900 group-hover:text-blue-700 transition">
-                    {item.title}
-                  </h3>
-
-                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed line-clamp-2">
-                    {item.desc}
-                  </p>
-                </div>
-
-                <div
-                  className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold transition"
-                  style={{ color: item.color }}
-                >
-                  <span>{isExternal ? 'Buka Tautan Luar' : 'Buka Halaman'}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-            );
-          })}
         </div>
       </section>
     </div>
