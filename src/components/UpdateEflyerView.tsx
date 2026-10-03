@@ -552,27 +552,6 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
         </div>
       </div>
 
-      {/* Admin Notice if Script not yet configured */}
-      {isAdmin && !config.eflayer_apps_script_url && (
-        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-start sm:items-center gap-2.5">
-            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
-            <div>
-              <p className="text-xs font-bold text-amber-900">Google Apps Script Khusus Eflayer Belum Terpasang</p>
-              <p className="text-[11px] text-amber-800">
-                Saat ini data disimpan di sistem lokal portal. Untuk mengirimkan baris baru secara otomatis ke Spreadsheet Google (sheet <em>Form Responses 1</em>) dan menyimpan foto ke Google Drive, silakan pasang Google Script.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setScriptModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shrink-0 cursor-pointer"
-          >
-            Lihat Panduan & Kode Script
-          </button>
-        </div>
-      )}
-
       {/* SUCCESS TOAST */}
       {submitSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">

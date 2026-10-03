@@ -19,7 +19,8 @@ export const initialConfig: SchoolConfig = {
   drive_folder_id: '1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS',
   drive_folder_name: 'Arsip Administrasi SMPIT Pondok Duta 2026/2027',
   drive_folder_perangkat_id: '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp',
-  drive_folder_perangkat_name: 'Folder Perangkat Pembelajaran'
+  drive_folder_perangkat_name: 'Folder Perangkat Pembelajaran',
+  eflayer_apps_script_url: 'https://script.google.com/macros/s/AKfycby599LImP-J6RkN-zYc77G1MhqYFtCz8-GfzT_8zi8vUVXIkSFs2A6KhI5B7obT9Ft2/exec'
 };
 
 // Data pengguna riil sekolah sesuai sheet "user" & "usulan_guru"
