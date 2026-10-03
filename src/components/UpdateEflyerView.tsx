@@ -564,10 +564,10 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-white/10">
           <button
             onClick={() => setActiveTab('form')}
-            className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'form'
-                ? 'bg-white text-blue-950 shadow-md'
-                : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                ? 'bg-white text-blue-950 shadow-md ring-2 ring-white/20'
+                : 'bg-white/10 hover:bg-white/20 hover:text-white text-slate-200'
             }`}
           >
             <Upload className="w-4 h-4 text-fuchsia-600" />
@@ -576,15 +576,21 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
 
           <button
             onClick={() => setActiveTab('progress')}
-            className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'progress'
-                ? 'bg-white text-blue-950 shadow-md'
-                : 'bg-white/10 hover:bg-white/15 text-slate-200'
+                ? 'bg-white text-blue-950 shadow-md ring-2 ring-white/20'
+                : 'bg-white/10 hover:bg-white/20 hover:text-white text-slate-200'
             }`}
           >
             <Award className="w-4 h-4 text-amber-500" />
             <span>Laporan / Progres (Jan - Des)</span>
-            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-fuchsia-500/30 text-[10px] text-fuchsia-200 font-extrabold">
+            <span
+              className={`ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-black tracking-tight transition-colors ${
+                activeTab === 'progress'
+                  ? 'bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300'
+                  : 'bg-fuchsia-950/70 text-fuchsia-200 border border-fuchsia-500/40'
+              }`}
+            >
               {reports.length} Data
             </span>
           </button>
