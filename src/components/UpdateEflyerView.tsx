@@ -86,7 +86,7 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
   // Google Apps Script Modal & Configuration
   const [scriptModalOpen, setScriptModalOpen] = useState(false);
   const [scriptUrlInput, setScriptUrlInput] = useState<string>(
-    config.eflayer_apps_script_url || ''
+    config.eflayer_apps_script_url || 'https://script.google.com/macros/s/AKfycbzwl296baWL4h3gCVlkWYzcEocV-wO3i-V0SZykFD5N29xBsyq2XZIjvGjv_NPzbQsW/exec'
   );
   const [scriptSaving, setScriptSaving] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
@@ -1626,7 +1626,7 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                     Panduan & Pengaturan Google Apps Script Eflayer
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Menghubungkan form portal ke Spreadsheet Google (1rJ45wTNmzykqXgjiep6HN0euVuI-S86Zze_dZuFAYBY)
+                    Menghubungkan form portal ke Spreadsheet Google (1MhXpEaCXJJSkwoRTtMi1yofgBRvyOgqX7nSdREJn-bU)
                   </p>
                 </div>
               </div>
@@ -1727,12 +1727,12 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                   <li className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
                     <strong>Buka Spreadsheet Google:</strong> Buka file spreadsheet respon eflyer di Google Drive:{' '}
                     <a
-                      href="https://docs.google.com/spreadsheets/d/1rJ45wTNmzykqXgjiep6HN0euVuI-S86Zze_dZuFAYBY/edit"
+                      href="https://docs.google.com/spreadsheets/d/1MhXpEaCXJJSkwoRTtMi1yofgBRvyOgqX7nSdREJn-bU/edit"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-blue-600 font-bold underline inline-flex items-center gap-1"
                     >
-                      <span>Buka Spreadsheet 1rJ45w...</span>
+                      <span>Buka Spreadsheet 1MhXpEa...</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </li>

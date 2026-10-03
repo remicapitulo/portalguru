@@ -91,7 +91,7 @@ export function getDrivePreviewEmbedUrl(rawUrl?: string): string {
   return rawUrl;
 }
 
-const EFLAYER_SPREADSHEET_ID = '1rJ45wTNmzykqXgjiep6HN0euVuI-S86Zze_dZuFAYBY';
+const EFLAYER_SPREADSHEET_ID = '1MhXpEaCXJJSkwoRTtMi1yofgBRvyOgqX7nSdREJn-bU';
 const EFLAYER_SHEET_NAME = 'Form Responses 1';
 const LOCAL_STORAGE_KEY = 'portal_guru_eflayer_local_submissions_v1';
 const CACHE_STORAGE_KEY = 'portal_guru_eflayer_sheet_cache_v1';
@@ -336,7 +336,7 @@ export class EflyerService {
     }
 
     // 2. Jalur Alternatif Mandiri: Google Apps Script Web App (Privat, Tanpa Share Public)
-    const scriptUrl = dbService.getConfig().eflayer_apps_script_url;
+    const scriptUrl = dbService.getConfig().eflayer_apps_script_url || 'https://script.google.com/macros/s/AKfycbzwl296baWL4h3gCVlkWYzcEocV-wO3i-V0SZykFD5N29xBsyq2XZIjvGjv_NPzbQsW/exec';
     if (scriptUrl) {
       try {
         const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=getEflyer&_t=${Date.now()}`;
@@ -507,7 +507,7 @@ export const EFLAYER_DRIVE_PARENT_FOLDER_ID = '1FA0fW-BwTF8EyRJ4F7FXYzjkUVLPr7Sj
 
 export const RECOMMENDED_APPS_SCRIPT_CODE = `/**
  * GOOGLE APPS SCRIPT KHUSUS UPDATE EFLAYER & SOSMED
- * Spreadsheet ID: 1rJ45wTNmzykqXgjiep6HN0euVuI-S86Zze_dZuFAYBY
+ * Spreadsheet ID: 1MhXpEaCXJJSkwoRTtMi1yofgBRvyOgqX7nSdREJn-bU
  * Sheet: "Form Responses 1"
  * Folder Utama Drive: 1FA0fW-BwTF8EyRJ4F7FXYzjkUVLPr7Sj2kkKKTb_THRopT94npUSxtQIDpqMCjUXvl5MESYe
  * (Raport Guru > Laporan Update Sosme...)
