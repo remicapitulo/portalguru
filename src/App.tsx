@@ -14,6 +14,7 @@ import { DataGuruView } from './components/DataGuruView';
 import { DatabaseManagerView } from './components/DatabaseManagerView';
 import { ReportPrintView } from './components/ReportPrintView';
 import { UpdateEflyerView } from './components/UpdateEflyerView';
+import { PenilaianView } from './components/PenilaianView';
 
 export default function App() {
   const [db, setDb] = useState<AppDatabase>(dbService.getDatabase());
@@ -175,6 +176,14 @@ export default function App() {
               currentUser={currentUser}
               db={db}
               config={db.config}
+            />
+          )}
+
+          {currentTab === 'penilaian' && (
+            <PenilaianView
+              currentUser={currentUser}
+              config={db.config}
+              allTeachers={teachers}
             />
           )}
 

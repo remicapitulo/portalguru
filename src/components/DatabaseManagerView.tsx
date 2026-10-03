@@ -77,6 +77,12 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
   const [driveFolderPerangkatId, setDriveFolderPerangkatId] = useState(
     config.drive_folder_perangkat_id || '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp'
   );
+  const [penilaianSpreadsheetId, setPenilaianSpreadsheetId] = useState(
+    config.penilaian_spreadsheet_id || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY'
+  );
+  const [penilaianAppsScriptUrl, setPenilaianAppsScriptUrl] = useState(
+    config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
+  );
   
   const [configSaved, setConfigSaved] = useState(false);
   const [identitySaved, setIdentitySaved] = useState(false);
@@ -114,6 +120,8 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
     setLogoFolderId(config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ');
     setDriveFolderId(config.drive_folder_id || '1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS');
     setDriveFolderPerangkatId(config.drive_folder_perangkat_id || '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp');
+    setPenilaianSpreadsheetId(config.penilaian_spreadsheet_id || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY');
+    setPenilaianAppsScriptUrl(config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec');
   }, [config]);
 
   // Helper to normalize Google Drive image links so they work universally in <img> and PDF
@@ -252,7 +260,9 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
       school_logo_url: schoolLogoUrl.trim(),
       logo_folder_id: logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
       drive_folder_id: driveFolderId.trim(),
-      drive_folder_perangkat_id: driveFolderPerangkatId.trim()
+      drive_folder_perangkat_id: driveFolderPerangkatId.trim(),
+      penilaian_spreadsheet_id: penilaianSpreadsheetId.trim() || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY',
+      penilaian_apps_script_url: penilaianAppsScriptUrl.trim() || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
     };
 
     // 1. Update local database immediately
@@ -1917,6 +1927,24 @@ function deleteUsulanFromSheet(rowIndex) {
                   Menyimpan otomatis profil pimpinan, penandatangan, dan tautan logo Google Drive.
                 </p>
               </div>
+
+              <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/90 space-y-1 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-purple-900 block">Sheet &ldquo;Penilaian_Antar_Rekan&rdquo; (Spreadsheet Terpisah)</span>
+                  <a
+                    href="https://docs.google.com/spreadsheets/d/1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY/edit"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline inline-flex items-center gap-1"
+                  >
+                    <span>Buka Spreadsheet Penilaian</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                  Spreadsheet ID: 1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY • Kolom: Timestamp, Tahun Ajaran, Semester, Peran Penilai, NIP/Nama Penilai, NIP/Nama Target, P1-P8 Skor, Rata-rata Skor, Catatan
+                </p>
+              </div>
             </div>
           </div>
 
@@ -2032,6 +2060,58 @@ function deleteUsulanFromSheet(rowIndex) {
                   placeholder="1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-[11px] focus:border-blue-600 outline-none"
                 />
+              </div>
+
+              {/* SECTION: PENILAIAN ANTAR REKAN */}
+              <div className="pt-3 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-purple-900 text-[11px] uppercase tracking-wider block">
+                    Penilaian Antar Rekan (API &amp; Spreadsheet)
+                  </span>
+                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                    Menu Khusus
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    Web App URL Google Apps Script (Penilaian Antar Rekan)
+                  </label>
+                  <input
+                    type="url"
+                    value={penilaianAppsScriptUrl}
+                    onChange={(e) => setPenilaianAppsScriptUrl(e.target.value)}
+                    placeholder="https://script.google.com/macros/s/AKfycbwNy.../exec"
+                    className="w-full px-3.5 py-2 rounded-xl border border-purple-200 bg-purple-50/30 font-mono text-[11px] focus:border-purple-600 outline-none"
+                  />
+                  <span className="text-[10px] text-purple-700 mt-0.5 block">
+                    Alamat web API GAS aktif untuk pengiriman &amp; sinkronisasi form evaluasi rekan sejawat.
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700">
+                      ID Google Spreadsheet (Penilaian Antar Rekan)
+                    </label>
+                    <a
+                      href={`https://docs.google.com/spreadsheets/d/${penilaianSpreadsheetId || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY'}/edit`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-purple-700 hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      Buka Sheet Penilaian
+                    </a>
+                  </div>
+                  <input
+                    type="text"
+                    value={penilaianSpreadsheetId}
+                    onChange={(e) => setPenilaianSpreadsheetId(e.target.value)}
+                    placeholder="1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-[11px] focus:border-purple-600 outline-none"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex items-center justify-between">

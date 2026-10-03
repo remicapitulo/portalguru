@@ -42,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     usulan: 'Suara Guru & Aspirasi',
     jurnal: 'Jurnal Mengajar Harian',
     eflayer: 'Update Eflayer',
+    penilaian: 'Penilaian Kinerja',
     'data-guru': 'Data Guru & Rekap',
     'db-manager': 'Database Spreadsheet & Sinkronisasi',
     'report-print': 'Unduh Laporan PDF',

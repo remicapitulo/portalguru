@@ -109,8 +109,15 @@ class FlexibleDatabaseService {
                 ? 'Tim Kurikulum'
                 : parsed.config.vice_headmaster_title,
               school_logo_url: parsed.config.school_logo_url || 'https://lh3.googleusercontent.com/d/1mnkKRHv-bqHsof1Lz4qdJd-o',
-              logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'
+              logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
+              penilaian_spreadsheet_id: parsed.config.penilaian_spreadsheet_id || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY',
+              penilaian_apps_script_url: parsed.config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
             };
+
+          if (!parsed.config.penilaian_apps_script_url) {
+            parsed.config.penilaian_apps_script_url = 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec';
+            needsResave = true;
+          }
 
           if (needsResave) {
             try {

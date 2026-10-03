@@ -26,6 +26,7 @@ export type NavItem =
   | 'usulan'
   | 'jurnal'
   | 'eflayer'
+  | 'penilaian'
   | 'data-guru'
   | 'db-manager';
 
@@ -106,11 +107,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badgeColor: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
     },
     {
-      label: 'Penilaian Antar Rekan',
-      shortLabel: 'Penilaian',
+      id: 'penilaian',
+      label: 'Penilaian Kinerja',
+      shortLabel: 'Kinerja',
       icon: <Award className="w-5 h-5 text-purple-400 shrink-0" />,
-      externalUrl: 'https://forms.gle/oWbXrJX3VncVWLDe9',
-      badge: 'Form',
+      badge: 'Rapor',
       badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
     },
     {

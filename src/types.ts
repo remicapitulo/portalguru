@@ -102,6 +102,8 @@ export interface SchoolConfig {
   spreadsheet_id: string;
   apps_script_url: string;
   eflayer_apps_script_url?: string;
+  penilaian_spreadsheet_id?: string;
+  penilaian_apps_script_url?: string;
 }
 
 export interface AppDatabase {
