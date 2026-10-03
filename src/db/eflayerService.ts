@@ -275,7 +275,33 @@ export class EflyerService {
         }
 
         const rawTimestamp = c[0]?.f || c[0]?.v || '';
-        const rawTanggal = c[1]?.f || c[1]?.v || rawTimestamp || '';
+
+        // Prioritas Utama Kolom B: "Tanggal Update" (Sesuai Permintaan Resmi Pengguna)
+        let resolvedTanggal = '';
+        const c1Val = c[1]?.v;
+        const c1Fmt = c[1]?.f;
+
+        if (c1Val && String(c1Val).startsWith('Date(')) {
+          const m = String(c1Val).match(/Date\((\d+),(\d+),(\d+)/);
+          if (m) {
+            const y = parseInt(m[1], 10);
+            const mo = parseInt(m[2], 10) + 1;
+            const d = parseInt(m[3], 10);
+            resolvedTanggal = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          }
+        }
+
+        if (!resolvedTanggal && c1Fmt) {
+          resolvedTanggal = String(c1Fmt).trim();
+        } else if (!resolvedTanggal && c1Val) {
+          resolvedTanggal = String(c1Val).trim();
+        }
+
+        // Fallback jika Kolom B kosong ke Kolom A (Timestamp)
+        if (!resolvedTanggal) {
+          resolvedTanggal = String(rawTimestamp).trim();
+        }
+
         const platform = c[3]?.v ? String(c[3].v).trim() : 'Status WA';
         const bukti1 = c[4]?.v ? String(c[4].v).trim() : '';
         const bukti2 = c[5]?.v ? String(c[5].v).trim() : '';
@@ -285,7 +311,7 @@ export class EflyerService {
         parsedReports.push({
           id: `EFL-SS-${index + 1}`,
           timestamp: String(rawTimestamp),
-          tanggal_update: String(rawTanggal),
+          tanggal_update: resolvedTanggal,
           nama,
           platform,
           bukti_1: bukti1,
@@ -296,9 +322,9 @@ export class EflyerService {
         });
       });
 
-      // Save cache in localStorage (sample of latest 1500 to keep within storage limits)
+      // Simpan data terbaru ke cache (ambil 2500 baris terbaru agar tahun 2026 selalu tercakup)
       try {
-        localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(parsedReports.slice(0, 1500)));
+        localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(parsedReports.slice(-2500)));
       } catch (err) {
         console.warn('Cache quota exceeded, skipping local storage cache of all rows');
       }
@@ -329,6 +355,28 @@ export class EflyerService {
     return [...local, ...sheet];
   }
 
+  // Helper ekstrak kata nama tanpa gelar akademik dan variasi konsonan ganda
+  public getNameTokens(str?: string): string[] {
+    if (!str) return [];
+    const titles = new Set([
+      'spd', 'mpd', 'ssos', 'shum', 'skom', 'sor', 'ssi', 'sag', 'si',
+      'spdi', 'mpdi', 'sgeo', 'st', 'se', 'mm', 'dra', 'drs'
+    ]);
+    return str
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .map((w) =>
+        w
+          .replace(/ll/g, 'l')
+          .replace(/rr/g, 'r')
+          .replace(/ff/g, 'f')
+          .replace(/tt/g, 't')
+          .replace(/ch/g, 'c')
+      )
+      .filter((w) => w.length > 1 && !titles.has(w));
+  }
+
   // Clean teacher name comparison to handle academic titles
   public normalizeName(name: string): string {
     if (!name) return '';
@@ -348,22 +396,42 @@ export class EflyerService {
       .trim();
   }
 
-  // Check if a report belongs to a given user
+  // Check if a report belongs to a given user (cerdas dan akurat)
   public isReportForUser(report: EflyerReport, user: User): boolean {
     if (!user) return false;
-    const repNameNorm = this.normalizeName(report.nama);
-    const userNameNorm = this.normalizeName(user.nama);
+    const reportName = report.nama || '';
+    const userName = user.nama || '';
 
-    if (repNameNorm === userNameNorm) return true;
-    if (userNameNorm.length > 4 && repNameNorm.includes(userNameNorm)) return true;
-    if (repNameNorm.length > 4 && userNameNorm.includes(repNameNorm)) return true;
+    // Kecocokan langsung
+    if (reportName.toLowerCase().trim() === userName.toLowerCase().trim()) return true;
 
-    // Check aliases if available
+    const repTokens = this.getNameTokens(reportName);
+    const userTokens = this.getNameTokens(userName);
+
+    if (repTokens.length > 0 && userTokens.length > 0) {
+      if (repTokens.join('') === userTokens.join('')) return true;
+
+      const common = repTokens.filter((w) =>
+        userTokens.includes(w) ||
+        userTokens.some((uw) => (w.length >= 4 && uw.includes(w)) || (uw.length >= 4 && w.includes(uw)))
+      );
+      if (common.length >= 2) return true;
+      if (common.length === 1 && (repTokens.length === 1 || userTokens.length === 1)) return true;
+    }
+
+    // Cek alias bila terdaftar
     if (user.nip_aliases && user.nip_aliases.length > 0) {
       for (const alias of user.nip_aliases) {
-        const aliasNorm = this.normalizeName(alias);
-        if (aliasNorm && (aliasNorm === repNameNorm || repNameNorm.includes(aliasNorm))) {
-          return true;
+        if (!alias) continue;
+        if (reportName.toLowerCase().includes(alias.toLowerCase().trim())) return true;
+        const aliasTokens = this.getNameTokens(alias);
+        if (aliasTokens.length > 0 && repTokens.length > 0) {
+          if (repTokens.join('') === aliasTokens.join('')) return true;
+          const common = repTokens.filter((w) =>
+            aliasTokens.includes(w) ||
+            aliasTokens.some((aw) => (w.length >= 4 && aw.includes(w)) || (aw.length >= 4 && w.includes(aw)))
+          );
+          if (common.length >= 2) return true;
         }
       }
     }

@@ -1161,7 +1161,7 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                     Matriks Laporan Eflayer Seluruh Guru ({selectedYear})
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Format sel: <strong>Jumlah Share (Poin Nilai)</strong>. Maksimal target 20 Share = 100 Poin.
+                    Format sel: <strong>Jumlah Share (Poin Nilai)</strong>. Klik angka pada sel bulan untuk membuka daftar berkas tangkapan layar bukti guru.
                   </p>
                 </div>
 
@@ -1208,7 +1208,25 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                           <td className="py-2.5 px-3 text-center font-bold text-slate-400">
                             {item.no}
                           </td>
-                          <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                          <td
+                            onClick={() => {
+                              if (item.totalShare > 0) {
+                                const teacherReports = reports.filter((r) => {
+                                  if (!eflyerService.isReportForUser(r, item.teacher)) return false;
+                                  const parsed = eflyerService.parseDate(r.tanggal_update || r.timestamp);
+                                  return parsed.year === selectedYear;
+                                });
+                                setProofListModal({
+                                  title: `Seluruh Bukti Share Tahun ${selectedYear} - ${item.teacher.nama}`,
+                                  reports: teacherReports,
+                                });
+                              }
+                            }}
+                            className={`py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap ${
+                              item.totalShare > 0 ? 'cursor-pointer hover:text-blue-700 hover:underline' : ''
+                            }`}
+                            title={item.totalShare > 0 ? `Klik untuk melihat seluruh ${item.totalShare} bukti tahun ${selectedYear}` : undefined}
+                          >
                             {item.teacher.nama}
                           </td>
                           <td className="py-2.5 px-2 text-slate-500 whitespace-nowrap">
@@ -1219,19 +1237,63 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                             return (
                               <td
                                 key={m.monthIndex}
-                                className={`py-2.5 px-2 text-center font-mono whitespace-nowrap ${
+                                onClick={() => {
+                                  if (hasShare) {
+                                    const monthReports = reports.filter((r) => {
+                                      if (!eflyerService.isReportForUser(r, item.teacher)) return false;
+                                      const parsed = eflyerService.parseDate(r.tanggal_update || r.timestamp);
+                                      return parsed.year === selectedYear && parsed.month === m.monthIndex + 1;
+                                    });
+                                    setProofListModal({
+                                      title: `Bukti Share Bulan ${m.monthName} ${selectedYear} - ${item.teacher.nama}`,
+                                      reports: monthReports,
+                                    });
+                                  }
+                                }}
+                                className={`py-2.5 px-2 text-center font-mono whitespace-nowrap transition-all ${
                                   hasShare
                                     ? m.poin >= 80
-                                      ? 'text-emerald-700 font-extrabold bg-emerald-50/40'
-                                      : 'text-blue-800 font-bold bg-blue-50/20'
+                                      ? 'text-emerald-700 font-extrabold bg-emerald-50/60 hover:bg-emerald-100 hover:text-emerald-900 cursor-pointer shadow-xs active:scale-95'
+                                      : 'text-blue-800 font-bold bg-blue-50/40 hover:bg-blue-100 hover:text-blue-900 cursor-pointer shadow-xs active:scale-95'
                                     : 'text-slate-300'
                                 }`}
+                                title={
+                                  hasShare
+                                    ? `Klik untuk membuka ${m.shareCount} bukti upload bulan ${m.monthName} (${item.teacher.nama})`
+                                    : `Belum ada upload bulan ${m.monthName}`
+                                }
                               >
-                                {hasShare ? `${m.shareCount} (${m.poin})` : '-'}
+                                {hasShare ? (
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="underline decoration-dotted underline-offset-2">
+                                      {m.shareCount} ({m.poin})
+                                    </span>
+                                  </span>
+                                ) : (
+                                  '-'
+                                )}
                               </td>
                             );
                           })}
-                          <td className="py-2.5 px-3 text-center font-black text-blue-900 bg-blue-50/30">
+                          <td
+                            onClick={() => {
+                              if (item.totalShare > 0) {
+                                const teacherReports = reports.filter((r) => {
+                                  if (!eflyerService.isReportForUser(r, item.teacher)) return false;
+                                  const parsed = eflyerService.parseDate(r.tanggal_update || r.timestamp);
+                                  return parsed.year === selectedYear;
+                                });
+                                setProofListModal({
+                                  title: `Seluruh Bukti Share Tahun ${selectedYear} - ${item.teacher.nama} (${item.totalShare} Bukti)`,
+                                  reports: teacherReports,
+                                });
+                              }
+                            }}
+                            className={`py-2.5 px-3 text-center font-black text-blue-900 bg-blue-50/30 ${
+                              item.totalShare > 0 ? 'cursor-pointer hover:bg-blue-100/70 hover:underline' : ''
+                            }`}
+                            title={item.totalShare > 0 ? 'Klik untuk melihat semua bukti tahun ini' : undefined}
+                          >
                             {item.totalShare}
                           </td>
                           <td className="py-2.5 px-3 text-center font-black text-indigo-900 bg-indigo-50/30">

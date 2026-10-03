@@ -120,7 +120,7 @@ export const initialUsers: User[] = [
     mapel: 'BK & Komite',
     email: 'anggita@smpitpondokduta.sch.id',
     avatar: 'A',
-    nip_aliases: ['03.24.08.89', '03.23.09.61', 'T-03.23.09.61', 'Anggita Aprilia Sari']
+    nip_aliases: ['03.24.08.89', '03.23.09.61', 'T-03.23.09.61', 'Anggita Aprilia Sari', 'Anggita Aprillia Sari', 'Anggita Aprillia Sari, S.Sos']
   }
 ];
 
