@@ -14,7 +14,6 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
-  Link as LinkIcon,
   AlertCircle,
   X,
   FileCheck,
@@ -939,11 +938,11 @@ export const PerangkatView: React.FC<PerangkatViewProps> = ({
                             )}
                           </div>
 
-                          {/* Action Buttons: Direct File Selector (supports multi-file) + Optional Link */}
-                          <div className="space-y-1.5 pt-2">
+                          {/* Action Button: Direct File Selector (supports multi-file upload) */}
+                          <div className="pt-2">
                             <button
                               onClick={() => handleTriggerDirectUpload(docType, sem, kls)}
-                              className={`w-full py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs ${
+                              className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer ${
                                 hasRecords
                                   ? 'bg-amber-500 hover:bg-amber-600 text-white'
                                   : 'bg-blue-700 hover:bg-blue-800 text-white'
@@ -951,14 +950,6 @@ export const PerangkatView: React.FC<PerangkatViewProps> = ({
                             >
                               <Upload className="w-3.5 h-3.5" />
                               <span>{hasRecords ? '+ Tambah File Lagi' : 'Pilih & Unggah File'}</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleOpenLinkModal(docType, sem, kls)}
-                              className="w-full text-center text-[10px] text-slate-400 hover:text-blue-600 font-semibold py-0.5 flex items-center justify-center gap-1 transition"
-                            >
-                              <LinkIcon className="w-2.5 h-2.5" />
-                              <span>atau tautkan link Drive</span>
                             </button>
                           </div>
                         </div>

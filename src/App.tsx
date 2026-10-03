@@ -13,6 +13,7 @@ import { JurnalView } from './components/JurnalView';
 import { DataGuruView } from './components/DataGuruView';
 import { DatabaseManagerView } from './components/DatabaseManagerView';
 import { ReportPrintView } from './components/ReportPrintView';
+import { UpdateEflyerView } from './components/UpdateEflyerView';
 
 export default function App() {
   const [db, setDb] = useState<AppDatabase>(dbService.getDatabase());
@@ -166,6 +167,14 @@ export default function App() {
             <JurnalView
               currentUser={currentUser}
               jurnalList={db.jurnalList}
+            />
+          )}
+
+          {currentTab === 'eflayer' && (
+            <UpdateEflyerView
+              currentUser={currentUser}
+              db={db}
+              config={db.config}
             />
           )}
 

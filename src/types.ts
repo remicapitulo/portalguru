@@ -101,6 +101,7 @@ export interface SchoolConfig {
   drive_folder_perangkat_name?: string;
   spreadsheet_id: string;
   apps_script_url: string;
+  eflayer_apps_script_url?: string;
 }
 
 export interface AppDatabase {

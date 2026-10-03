@@ -25,6 +25,7 @@ export type NavItem =
   | 'kaldik'
   | 'usulan'
   | 'jurnal'
+  | 'eflayer'
   | 'data-guru'
   | 'db-manager';
 
@@ -97,20 +98,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <BookOpenCheck className="w-5 h-5 text-teal-400 shrink-0" />,
     },
     {
+      id: 'eflayer',
+      label: 'Update Eflayer',
+      shortLabel: 'Eflayer',
+      icon: <Share2 className="w-5 h-5 text-fuchsia-400 shrink-0" />,
+      badge: 'Sosmed',
+      badgeColor: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+    },
+    {
       label: 'Penilaian Antar Rekan',
       shortLabel: 'Penilaian',
       icon: <Award className="w-5 h-5 text-purple-400 shrink-0" />,
       externalUrl: 'https://forms.gle/oWbXrJX3VncVWLDe9',
       badge: 'Form',
       badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    },
-    {
-      label: 'Update Eflayer Sosmed',
-      shortLabel: 'Eflayer',
-      icon: <Share2 className="w-5 h-5 text-fuchsia-400 shrink-0" />,
-      externalUrl: 'https://forms.gle/5SeuC8XTp6SzWoBo9',
-      badge: 'Sosmed',
-      badgeColor: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
     },
     {
       id: 'data-guru',

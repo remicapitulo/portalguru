@@ -41,6 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     kaldik: 'Kalender Pendidikan',
     usulan: 'Suara Guru & Aspirasi',
     jurnal: 'Jurnal Mengajar Harian',
+    eflayer: 'Update Eflayer',
     'data-guru': 'Data Guru & Rekap',
     'db-manager': 'Database Spreadsheet & Sinkronisasi',
     'report-print': 'Unduh Laporan PDF',
