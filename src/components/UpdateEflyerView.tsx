@@ -96,6 +96,27 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
   const [adminViewMode, setAdminViewMode] = useState<'matrix' | 'log'>('matrix');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<number | 'all'>('all');
+
+  // Pilih Tahun laporan berdasarkan data yang masuk saja (jika tidak ada data, tahun dihilangkan)
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<number>();
+    reports.forEach((r) => {
+      const parsed = eflyerService.parseDate(r.tanggal_update || r.timestamp);
+      if (parsed.year && parsed.year >= 2020 && parsed.year <= 2035) {
+        yearsSet.add(parsed.year);
+      }
+    });
+
+    const sorted = Array.from(yearsSet).sort((a, b) => b - a);
+    return sorted.length > 0 ? sorted : [new Date().getFullYear()];
+  }, [reports]);
+
+  // Otomatis sinkronkan selectedYear jika tahun yang dipilih tidak ada di daftar data yang masuk
+  useEffect(() => {
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears[0]);
+    }
+  }, [availableYears, selectedYear]);
   
   // Screenshot modal preview
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -315,10 +336,9 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
 
   const teacherAnnualStats = useMemo(() => {
     const totalShare = teacherMonthlySummary.reduce((acc, m) => acc + m.shareCount, 0);
-    const monthsWithShare = teacherMonthlySummary.filter((m) => m.shareCount > 0);
-    const avgPoin = monthsWithShare.length > 0
-      ? Math.round(monthsWithShare.reduce((acc, m) => acc + m.poin, 0) / monthsWithShare.length)
-      : 0;
+    const totalPoin = teacherMonthlySummary.reduce((acc, m) => acc + m.poin, 0);
+    // Poin akhir dihitung berdasarkan 12 bulan (bulan yang kosong tetap menjadi pembagi 12)
+    const avgPoin = Math.round(totalPoin / 12);
     const maxMonth = [...teacherMonthlySummary].sort((a, b) => b.shareCount - a.shareCount)[0];
     return { totalShare, avgPoin, maxMonth };
   }, [teacherMonthlySummary]);
@@ -328,10 +348,9 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
     return teachers.map((teacher, index) => {
       const summaries = eflyerService.calculateTeacherMonthlySummary(reports, teacher, selectedYear);
       const totalShare = summaries.reduce((acc, m) => acc + m.shareCount, 0);
-      const monthsWithShare = summaries.filter((m) => m.shareCount > 0);
-      const avgPoin = monthsWithShare.length > 0
-        ? Math.round(monthsWithShare.reduce((acc, m) => acc + m.poin, 0) / monthsWithShare.length)
-        : 0;
+      const totalPoin = summaries.reduce((acc, m) => acc + m.poin, 0);
+      // Poin akhir dihitung berdasarkan 12 bulan (bulan yang kosong tetap menjadi pembagi 12)
+      const avgPoin = Math.round(totalPoin / 12);
       return {
         no: index + 1,
         teacher,
@@ -395,7 +414,7 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
     doc.text(
-      'Kriteria Poin: 0 Share = 0 Poin | 1 Share = 56 Poin | 2 Share = 58 Poin | ... | 19 Share = 92 Poin | >= 20 Share = 100 Poin (Format Sel: [Jumlah Share] / [Poin])',
+      'Kriteria Poin: 0 Share = 0 Poin | 1 Share = 56 Poin | 2 Share = 58 Poin | ... | >= 20 Share = 100 Poin (Format Sel: [Jumlah Share] / [Poin]) • Poin Akhir dihitung dibagi 12 bulan (bulan kosong tetap menjadi pembagi 12)',
       14,
       32
     );
@@ -985,12 +1004,13 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:border-blue-600 outline-none"
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 focus:border-blue-600 outline-none cursor-pointer"
                 >
-                  <option value={2026}>Tahun 2026</option>
-                  <option value={2025}>Tahun 2025</option>
-                  <option value={2024}>Tahun 2024</option>
-                  <option value={2023}>Tahun 2023</option>
+                  {availableYears.map((yr) => (
+                    <option key={yr} value={yr}>
+                      Tahun {yr}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1042,6 +1062,10 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
             <p className="text-amber-800/90 text-[11px] leading-relaxed">
               <strong>0 Share:</strong> 0 Poin • <strong>1 Share:</strong> 56 Poin • <strong>2 Share:</strong> 58 Poin • ... • <strong>10 Share:</strong> 74 Poin • ... • <strong>19 Share:</strong> 92 Poin • <strong>20+ Share:</strong> 100 Poin.
               (Setiap penambahan share menambah 2 poin hingga maksimal 100 poin).
+              <br />
+              <span className="font-semibold text-amber-950 mt-1 inline-block">
+                • <strong>Poin Akhir (Rata Poin):</strong> Dihitung berdasarkan akumulasi poin selama 12 bulan penuh dibagi 12. Jika ada bulan yang kosong (0 poin), maka tetap menjadi pembagi 12 dan mempengaruhi poin akhir.
+              </span>
             </p>
           </div>
 

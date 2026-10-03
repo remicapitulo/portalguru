@@ -125,20 +125,35 @@ export class EflyerService {
     // Standard ISO YYYY-MM-DD
     if (/^\d{4}-\d{1,2}-\d{1,2}/.test(rawDate)) {
       const parts = rawDate.split('T')[0].split('-');
-      const y = parseInt(parts[0], 10);
+      let y = parseInt(parts[0], 10);
+      if (y === 2926) y = 2026;
+      if (y === 2925) y = 2025;
+      if (y === 26 || y === 2026) y = 2026;
+      if (y === 25 || y === 2025) y = 2025;
       const m = parseInt(parts[1], 10);
       const d = parseInt(parts[2], 10);
       return { year: y, month: m, day: d, formatted: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
     }
 
-    // M/D/YYYY or D/M/YYYY
+    // M/D/YYYY or D/M/YYYY or YYYY/M/D
     const slashParts = rawDate.split(' ')[0].split('/');
     if (slashParts.length === 3) {
       const p1 = parseInt(slashParts[0], 10);
       const p2 = parseInt(slashParts[1], 10);
-      const p3 = parseInt(slashParts[2], 10);
-      // Usually Google Sheets in US locale is M/D/YYYY
-      const y = p3 < 100 ? 2000 + p3 : p3;
+      let p3 = parseInt(slashParts[2], 10);
+      if (p1 > 1000) {
+        let y = p1;
+        if (y === 2926) y = 2026;
+        if (y === 2925) y = 2025;
+        const m = p2;
+        const d = p3;
+        return { year: y, month: m, day: d, formatted: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
+      }
+      let y = p3 < 100 ? 2000 + p3 : p3;
+      if (y === 2926) y = 2026;
+      if (y === 2925) y = 2025;
+      if (y === 26 || y === 2026) y = 2026;
+      if (y === 25 || y === 2025) y = 2025;
       const m = p1 <= 12 ? p1 : p2;
       const d = p1 <= 12 ? p2 : p1;
       return { year: y, month: m, day: d, formatted: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
