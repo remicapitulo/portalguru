@@ -101,6 +101,7 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [previewLoadError, setPreviewLoadError] = useState(false);
   const [proofListModal, setProofListModal] = useState<{ title: string; reports: EflyerReport[] } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const openPreview = (url: string) => {
     setPreviewLoadError(false);
@@ -132,11 +133,22 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
   // Load initial reports
   const loadData = async () => {
     setLoading(true);
+    setSyncError(null);
     try {
-      const all = await eflyerService.getAllReports();
-      setReports(all);
-    } catch (e) {
+      const sheetRes = await eflyerService.fetchSpreadsheetReports();
+      const local = eflyerService.getLocalReports();
+      if (sheetRes.success) {
+        setReports([...local, ...sheetRes.data]);
+        setSyncError(null);
+      } else {
+        setReports(local);
+        if (sheetRes.message) {
+          setSyncError(sheetRes.message);
+        }
+      }
+    } catch (e: any) {
       console.warn('Error loading reports:', e);
+      setSyncError(e?.message || 'Gagal memuat data dari Spreadsheet');
     } finally {
       setLoading(false);
     }
@@ -148,12 +160,20 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setSyncError(null);
     try {
       const res = await eflyerService.fetchSpreadsheetReports();
       const local = eflyerService.getLocalReports();
       if (res.success) {
         setReports([...local, ...res.data]);
+        setSyncError(null);
+      } else {
+        if (res.message) {
+          setSyncError(res.message);
+        }
       }
+    } catch (err: any) {
+      setSyncError(err?.message || 'Gagal memuat data dari Spreadsheet');
     } finally {
       setRefreshing(false);
     }
@@ -551,6 +571,27 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* SPREADSHEET ACCESS WARNING IF RESTRICTED */}
+      {syncError && (
+        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <p className="text-xs font-bold text-amber-900">Perhatian: Sinkronisasi Google Spreadsheet</p>
+              <p className="text-[11px] text-amber-800">{syncError}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shrink-0 cursor-pointer flex items-center gap-1.5 self-end sm:self-auto"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Coba Sinkron Ulang</span>
+          </button>
+        </div>
+      )}
 
       {/* SUCCESS TOAST */}
       {submitSuccess && (

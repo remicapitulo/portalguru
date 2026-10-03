@@ -1,4 +1,5 @@
 import { User } from '../types';
+import { dbService } from './storage';
 
 export interface EflyerReport {
   id: string;
@@ -248,101 +249,130 @@ export class EflyerService {
 
   // Fetch live reports from Google Spreadsheet Form Responses 1
   public async fetchSpreadsheetReports(): Promise<{ success: boolean; data: EflyerReport[]; message?: string }> {
+    // 1. Jalur Utama Tercepat: Google Visualization API (jika Spreadsheet memiliki izin Pelihat)
     try {
       const csvUrl = `https://docs.google.com/spreadsheets/d/${EFLAYER_SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(EFLAYER_SHEET_NAME)}&_t=${Date.now()}`;
       
       const res = await fetch(csvUrl);
-      const text = await res.text();
+      if (res.status === 200) {
+        const text = await res.text();
+        if (!text.includes('ServiceLogin') && !text.includes('accounts.google.com') && !text.startsWith('<!DOCTYPE html>')) {
+          const jsonStart = text.indexOf('{');
+          const jsonEnd = text.lastIndexOf('}');
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const rawJson = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
+            const rows = rawJson?.table?.rows || [];
 
-      // Extract JSON from Google's /*O_o*/ google.visualization.Query.setResponse({...});
-      const jsonStart = text.indexOf('{');
-      const jsonEnd = text.lastIndexOf('}');
-      if (jsonStart === -1 || jsonEnd === -1) {
-        throw new Error('Format respon Google Sheets tidak sesuai');
-      }
+            const parsedReports: EflyerReport[] = [];
 
-      const rawJson = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
-      const rows = rawJson?.table?.rows || [];
+            rows.forEach((row: any, index: number) => {
+              const c = row?.c || [];
+              const nama = c[2]?.v ? String(c[2].v).trim() : '';
+              if (!nama || nama.toLowerCase() === 'nama' || nama === '1' || nama === '0') {
+                return;
+              }
 
-      const parsedReports: EflyerReport[] = [];
+              const rawTimestamp = c[0]?.f || c[0]?.v || '';
 
-      rows.forEach((row: any, index: number) => {
-        const c = row?.c || [];
-        const nama = c[2]?.v ? String(c[2].v).trim() : '';
-        // Skip header or empty rows
-        if (!nama || nama.toLowerCase() === 'nama' || nama === '1' || nama === '0') {
-          return;
-        }
+              // Prioritas Utama Kolom B: "Tanggal Update" (Sesuai Permintaan Resmi Pengguna)
+              let resolvedTanggal = '';
+              const c1Val = c[1]?.v;
+              const c1Fmt = c[1]?.f;
 
-        const rawTimestamp = c[0]?.f || c[0]?.v || '';
+              if (c1Val && String(c1Val).startsWith('Date(')) {
+                const m = String(c1Val).match(/Date\((\d+),(\d+),(\d+)/);
+                if (m) {
+                  const y = parseInt(m[1], 10);
+                  const mo = parseInt(m[2], 10) + 1;
+                  const d = parseInt(m[3], 10);
+                  resolvedTanggal = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                }
+              }
 
-        // Prioritas Utama Kolom B: "Tanggal Update" (Sesuai Permintaan Resmi Pengguna)
-        let resolvedTanggal = '';
-        const c1Val = c[1]?.v;
-        const c1Fmt = c[1]?.f;
+              if (!resolvedTanggal && c1Fmt) {
+                resolvedTanggal = String(c1Fmt).trim();
+              } else if (!resolvedTanggal && c1Val) {
+                resolvedTanggal = String(c1Val).trim();
+              }
 
-        if (c1Val && String(c1Val).startsWith('Date(')) {
-          const m = String(c1Val).match(/Date\((\d+),(\d+),(\d+)/);
-          if (m) {
-            const y = parseInt(m[1], 10);
-            const mo = parseInt(m[2], 10) + 1;
-            const d = parseInt(m[3], 10);
-            resolvedTanggal = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+              // Fallback jika Kolom B kosong ke Kolom A (Timestamp)
+              if (!resolvedTanggal) {
+                resolvedTanggal = String(rawTimestamp).trim();
+              }
+
+              const platform = c[3]?.v ? String(c[3].v).trim() : 'Status WA';
+              const bukti1 = c[4]?.v ? String(c[4].v).trim() : '';
+              const bukti2 = c[5]?.v ? String(c[5].v).trim() : '';
+              const bukti3 = c[6]?.v ? String(c[6].v).trim() : '';
+              const bukti4 = c[7]?.v ? String(c[7].v).trim() : '';
+
+              parsedReports.push({
+                id: `EFL-SS-${index + 1}`,
+                timestamp: String(rawTimestamp),
+                tanggal_update: resolvedTanggal,
+                nama,
+                platform,
+                bukti_1: bukti1,
+                bukti_2: bukti2,
+                bukti_3: bukti3,
+                bukti_4: bukti4,
+                source: 'spreadsheet'
+              });
+            });
+
+            // Simpan data terbaru ke cache
+            try {
+              localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(parsedReports.slice(-2500)));
+            } catch (err) {
+              // ignore
+            }
+
+            return { success: true, data: parsedReports };
           }
         }
-
-        if (!resolvedTanggal && c1Fmt) {
-          resolvedTanggal = String(c1Fmt).trim();
-        } else if (!resolvedTanggal && c1Val) {
-          resolvedTanggal = String(c1Val).trim();
-        }
-
-        // Fallback jika Kolom B kosong ke Kolom A (Timestamp)
-        if (!resolvedTanggal) {
-          resolvedTanggal = String(rawTimestamp).trim();
-        }
-
-        const platform = c[3]?.v ? String(c[3].v).trim() : 'Status WA';
-        const bukti1 = c[4]?.v ? String(c[4].v).trim() : '';
-        const bukti2 = c[5]?.v ? String(c[5].v).trim() : '';
-        const bukti3 = c[6]?.v ? String(c[6].v).trim() : '';
-        const bukti4 = c[7]?.v ? String(c[7].v).trim() : '';
-
-        parsedReports.push({
-          id: `EFL-SS-${index + 1}`,
-          timestamp: String(rawTimestamp),
-          tanggal_update: resolvedTanggal,
-          nama,
-          platform,
-          bukti_1: bukti1,
-          bukti_2: bukti2,
-          bukti_3: bukti3,
-          bukti_4: bukti4,
-          source: 'spreadsheet'
-        });
-      });
-
-      // Simpan data terbaru ke cache (ambil 2500 baris terbaru agar tahun 2026 selalu tercakup)
-      try {
-        localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(parsedReports.slice(-2500)));
-      } catch (err) {
-        console.warn('Cache quota exceeded, skipping local storage cache of all rows');
       }
-
-      return { success: true, data: parsedReports };
-    } catch (err: any) {
-      console.warn('Fetch from spreadsheet failed, using cache:', err);
-      // Fallback to cache if available
-      try {
-        const cached = localStorage.getItem(CACHE_STORAGE_KEY);
-        if (cached) {
-          return { success: true, data: JSON.parse(cached), message: 'Menggunakan data cache tersimpan' };
-        }
-      } catch (e) {
-        // ignore
-      }
-      return { success: false, data: [], message: err.message || 'Gagal memuat data dari Spreadsheet' };
+    } catch (gvizErr) {
+      console.warn('GViz direct query skipped or failed, trying Google Apps Script fallback:', gvizErr);
     }
+
+    // 2. Jalur Alternatif Mandiri: Google Apps Script Web App (Privat, Tanpa Share Public)
+    const scriptUrl = dbService.getConfig().eflayer_apps_script_url;
+    if (scriptUrl) {
+      try {
+        const gasUrl = `${scriptUrl}${scriptUrl.includes('?') ? '&' : '?'}action=getEflyer&_t=${Date.now()}`;
+        const gasRes = await fetch(gasUrl);
+        const gasJson = await gasRes.json();
+        if (gasJson && gasJson.success && Array.isArray(gasJson.data) && gasJson.data.length > 0) {
+          try {
+            localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(gasJson.data.slice(-2500)));
+          } catch (e) {
+            // ignore
+          }
+          return { success: true, data: gasJson.data };
+        }
+      } catch (gasErr) {
+        console.warn('Google Apps Script fetch failed:', gasErr);
+      }
+    }
+
+    // 3. Fallback ke Cache Lokal jika tersedia
+    try {
+      const cached = localStorage.getItem(CACHE_STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return { success: true, data: parsed, message: 'Menggunakan data cache tersimpan' };
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return {
+      success: false,
+      data: [],
+      message: 'Akses Spreadsheet saat ini "Dibatasi" dan Google Script belum mengembalikan data. Anda dapat mengubah Akses Umum Spreadsheet menjadi "Siapa saja yang memiliki link: Pelihat" agar data otomatis ditarik langsung, ATAU perbarui kode Google Apps Script (fungsi doGet).'
+    };
   }
 
   // Get all reports combined (local + spreadsheet)
@@ -622,6 +652,72 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput("Google Script Update Eflayer Aktif dan Siap Menerima Laporan.").setMimeType(ContentService.MimeType.TEXT);
+  try {
+    var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : '';
+
+    // Ambil data laporan Eflayer secara privat tanpa perlu share link Spreadsheet
+    if (action === 'getEflyer') {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName("Form Responses 1");
+      if (!sheet) {
+        return ContentService.createTextOutput(JSON.stringify({ success: true, data: [] }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var values = sheet.getDataRange().getValues();
+      var reports = [];
+
+      for (var i = 1; i < values.length; i++) {
+        var row = values[i];
+        var nama = row[2] ? String(row[2]).trim() : '';
+        if (!nama || nama.toLowerCase() === 'nama') continue;
+
+        var rawTs = row[0];
+        var rawTgl = row[1] || rawTs;
+        var tglStr = '';
+        if (rawTgl instanceof Date) {
+          tglStr = Utilities.formatDate(rawTgl, Session.getScriptTimeZone() || 'Asia/Jakarta', 'yyyy-MM-dd');
+        } else {
+          tglStr = String(rawTgl || '');
+        }
+
+        var tsStr = '';
+        if (rawTs instanceof Date) {
+          tsStr = Utilities.formatDate(rawTs, Session.getScriptTimeZone() || 'Asia/Jakarta', 'yyyy-MM-dd HH:mm:ss');
+        } else {
+          tsStr = String(rawTs || '');
+        }
+
+        reports.push({
+          id: 'EFL-GAS-' + i,
+          timestamp: tsStr,
+          tanggal_update: tglStr,
+          nama: nama,
+          platform: String(row[3] || 'Status WA'),
+          bukti_1: String(row[4] || ''),
+          bukti_2: String(row[5] || ''),
+          bukti_3: String(row[6] || ''),
+          bukti_4: String(row[7] || ''),
+          source: 'spreadsheet'
+        });
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        data: reports
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      message: "Google Script Update Eflayer Aktif dan Siap Menerima Laporan."
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 }`;
 
