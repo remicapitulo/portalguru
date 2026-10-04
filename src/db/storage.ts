@@ -1,4 +1,4 @@
-import { AppDatabase, User, AcademicEvent, UploadRecord, UsulanItem, JurnalItem, SchoolConfig, DocumentType, SemesterType, GradeClass } from '../types';
+import { AppDatabase, User, AcademicEvent, UploadRecord, UsulanItem, JurnalItem, KetidakhadiranItem, SchoolConfig, DocumentType, SemesterType, GradeClass } from '../types';
 import { initialDatabase, initialConfig } from './initialData';
 
 const STORAGE_KEY = 'portal_guru_smpit_pondok_duta_db_v1';
@@ -117,6 +117,23 @@ class FlexibleDatabaseService {
           if (!parsed.config.penilaian_apps_script_url) {
             parsed.config.penilaian_apps_script_url = 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec';
             needsResave = true;
+          }
+
+          if (!Array.isArray(parsed.ketidakhadiranList) || parsed.ketidakhadiranList.length === 0) {
+            parsed.ketidakhadiranList = JSON.parse(JSON.stringify(initialDatabase.ketidakhadiranList || []));
+            needsResave = true;
+          } else {
+            // Ensure sample pending item KTH-005 is available if no pending item is present
+            const hasPending = parsed.ketidakhadiranList.some((k: any) =>
+              k.status === 'Menunggu' || k.status === 'Menunggu Verifikasi' || k.id === 'KTH-005'
+            );
+            if (!hasPending) {
+              const pendingItem = initialDatabase.ketidakhadiranList.find((k) => k.id === 'KTH-005');
+              if (pendingItem) {
+                parsed.ketidakhadiranList.push(JSON.parse(JSON.stringify(pendingItem)));
+                needsResave = true;
+              }
+            }
           }
 
           if (needsResave) {
@@ -630,6 +647,49 @@ class FlexibleDatabaseService {
 
   public deleteJurnal(id: string) {
     this.db.jurnalList = this.db.jurnalList.filter((j) => j.id !== id);
+    this.saveToStorage();
+  }
+
+  // ===== DAFTAR KETIDAKHADIRAN GURU (DATABASE UTAMA) =====
+  public getKetidakhadiranList(nip?: string): KetidakhadiranItem[] {
+    const list = this.db.ketidakhadiranList || [];
+    if (nip) {
+      const clean = nip.replace(/^T-|^USR-/, '').trim();
+      return list.filter((k) => k.nip === nip || k.nip.replace(/^T-|^USR-/, '').trim() === clean);
+    }
+    return list;
+  }
+
+  public replaceKetidakhadiran(list: KetidakhadiranItem[]) {
+    this.db.ketidakhadiranList = list;
+    this.saveToStorage();
+  }
+
+  public addKetidakhadiran(item: Omit<KetidakhadiranItem, 'id' | 'created_at'>): KetidakhadiranItem {
+    const newItem: KetidakhadiranItem = {
+      ...item,
+      id: 'KTH-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      created_at: new Date().toISOString()
+    };
+    if (!Array.isArray(this.db.ketidakhadiranList)) {
+      this.db.ketidakhadiranList = [];
+    }
+    this.db.ketidakhadiranList.unshift(newItem);
+    this.saveToStorage();
+    return newItem;
+  }
+
+  public updateKetidakhadiran(id: string, updates: Partial<KetidakhadiranItem>) {
+    if (!Array.isArray(this.db.ketidakhadiranList)) return;
+    this.db.ketidakhadiranList = this.db.ketidakhadiranList.map((item) =>
+      item.id === id ? { ...item, ...updates } : item
+    );
+    this.saveToStorage();
+  }
+
+  public deleteKetidakhadiran(id: string) {
+    if (!Array.isArray(this.db.ketidakhadiranList)) return;
+    this.db.ketidakhadiranList = this.db.ketidakhadiranList.filter((item) => item.id !== id);
     this.saveToStorage();
   }
 

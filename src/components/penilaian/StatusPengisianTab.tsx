@@ -208,8 +208,14 @@ export const StatusPengisianTab: React.FC<StatusPengisianTabProps> = ({
                     <td className="py-3 px-4 text-center">
                       <div className="flex flex-col items-center gap-1">
                         <span className="font-bold text-slate-800">
-                          {item.countGiven} / {item.totalColleagues} Guru
+                          {item.countGiven} / {item.totalColleagues} Target
                         </span>
+                        {item.hasSelfEvaluated && (
+                          <span className="text-[9px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5" title="Sudah mengisi penilaian mandiri (diri sendiri)">
+                            <span>★</span>
+                            <span>Diri Sendiri</span>
+                          </span>
+                        )}
                         <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${

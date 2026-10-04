@@ -1,5 +1,6 @@
-import { User, SemesterType, SchoolConfig } from '../types';
+import { User, SemesterType, SchoolConfig, KetidakhadiranItem } from '../types';
 import { initialUsers, initialConfig } from './initialData';
+import { dbService } from './storage';
 
 export const PENILAIAN_SPREADSHEET_ID = '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY';
 export const DEFAULT_PENILAIAN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec';
@@ -212,12 +213,13 @@ export const GAS_SCRIPT_CODE = `/**
  * SMPIT PONDOK DUTA
  * ID Spreadsheet: 1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY
  * =========================================================================
- * 5 MODUL DATABASE UTAMA TERINTEGRASI:
+ * 6 MODUL DATABASE UTAMA TERINTEGRASI:
  * 1. Sheet "Penilaian_Antar_Rekan" -> 8 Indikator Evaluasi Sikap Guru Sejawat
  * 2. Sheet "Supervisi"              -> 1a. KBM & 1b. Administrasi (Kepala/Waka Sekolah)
  * 3. Sheet "Absensi_Disiplin"       -> 2a. Hadir, 2b. Telat, 2c. Pulang, 2d. Doa, 2e. Flyer
  * 4. Sheet "Kegiatan_Yayasan"      -> 3a. Milad, 3b. Ta'lim, 3c. Sosialisasi Yayasan
  * 5. Sheet "Rapor_Diktendik"        -> Rekapitulasi Rapor Komprehensif Seluruh Guru
+ * 6. Sheet "Ketidakhadiran"        -> Daftar Izin, Sakit, Cuti, & Dinas Luar Guru
  * =========================================================================
  * PETUNJUK INSTALASI / PEMBARUAN:
  * 1. Buka spreadsheet database:
@@ -267,12 +269,13 @@ function menuInitAllSheets() {
   try {
     SpreadsheetApp.getUi().alert(
       "Sukses Inisialisasi!",
-      "Seluruh 5 Sheet Penilaian Kinerja Diktendik berhasil disiapkan:\\n\\n" +
+      "Seluruh 6 Sheet Penilaian Kinerja & Presensi berhasil disiapkan:\\n\\n" +
       "1. Penilaian_Antar_Rekan\\n" +
       "2. Supervisi\\n" +
       "3. Absensi_Disiplin\\n" +
       "4. Kegiatan_Yayasan\\n" +
-      "5. Rapor_Diktendik",
+      "5. Rapor_Diktendik\\n" +
+      "6. Ketidakhadiran",
       SpreadsheetApp.getUi().ButtonSet.OK
     );
   } catch (e) {}
@@ -365,13 +368,24 @@ function getRaporSheet(ss) {
   return getOrCreateSheet(ss, "Rapor_Diktendik", headers, "#0F172A");
 }
 
-// Inisialisasi kelima sheet
+// 6. Sheet Ketidakhadiran
+function getKetidakhadiranSheet(ss) {
+  var headers = [
+    "ID", "NIP", "Nama Guru", "Mapel", "Tanggal Mulai", "Tanggal Selesai",
+    "Jenis", "Keterangan", "Inval Guru", "Kelas", "Bukti Surat",
+    "Status", "Catatan Admin", "Created At"
+  ];
+  return getOrCreateSheet(ss, "Ketidakhadiran", headers, "#BE123C");
+}
+
+// Inisialisasi keenam sheet
 function initAllSheets(ss) {
   getPenilaianSheet(ss);
   getSupervisiSheet(ss);
   getAbsensiSheet(ss);
   getYayasanSheet(ss);
   getRaporSheet(ss);
+  getKetidakhadiranSheet(ss);
 }
 
 function doPost(e) {
@@ -666,6 +680,137 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // =========================================================================
+    // ACTION 6: MANAJEMEN KETIDAKHADIRAN GURU
+    // =========================================================================
+    if (action === "addKetidakhadiran") {
+      var sheetKet = getKetidakhadiranSheet(ss);
+      var kData = data.ketidakhadiranData || data;
+      var newId = kData.id || ("KTH-" + Utilities.getUuid().substring(0, 8).toUpperCase());
+      sheetKet.appendRow([
+        newId,
+        kData.nip || "",
+        kData.nama || "",
+        kData.mapel || "",
+        kData.tanggal_awal || "",
+        kData.tanggal_akhir || kData.tanggal_awal || "",
+        kData.jenis || "Izin",
+        kData.keterangan || "",
+        kData.inval_guru || "",
+        kData.kelas_terdampak || "",
+        kData.surat_bukti_url || "",
+        kData.status || "Disetujui",
+        kData.catatan_admin || "",
+        kData.created_at || timestamp
+      ]);
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: "Catatan ketidakhadiran berhasil ditambahkan ke spreadsheet penilaian!",
+        id: newId
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "updateKetidakhadiran") {
+      var sheetKet = getKetidakhadiranSheet(ss);
+      var kData = data.ketidakhadiranData || data;
+      var rows = sheetKet.getDataRange().getValues();
+      for (var r = 1; r < rows.length; r++) {
+        if (String(rows[r][0]).trim() === String(kData.id).trim() || (kData.rowIndex && kData.rowIndex === r + 1)) {
+          if (kData.status) sheetKet.getRange(r + 1, 12).setValue(kData.status);
+          if (kData.catatan_admin) sheetKet.getRange(r + 1, 13).setValue(kData.catatan_admin);
+          return ContentService.createTextOutput(JSON.stringify({
+            success: true,
+            message: "Status ketidakhadiran berhasil diperbarui!"
+          })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        error: "Data ketidakhadiran tidak ditemukan."
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "deleteKetidakhadiran") {
+      var sheetKet = getKetidakhadiranSheet(ss);
+      var idToDelete = data.id;
+      var rowIdx = data.rowIndex;
+      if (rowIdx && rowIdx > 1) {
+        sheetKet.deleteRow(rowIdx);
+        return ContentService.createTextOutput(JSON.stringify({
+          success: true,
+          message: "Baris ketidakhadiran berhasil dihapus!"
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var rows = sheetKet.getDataRange().getValues();
+      for (var r = rows.length - 1; r >= 1; r--) {
+        if (String(rows[r][0]).trim() === String(idToDelete).trim()) {
+          sheetKet.deleteRow(r + 1);
+          return ContentService.createTextOutput(JSON.stringify({
+            success: true,
+            message: "Catatan ketidakhadiran berhasil dihapus!"
+          })).setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        error: "ID ketidakhadiran tidak ditemukan."
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // =========================================================================
+    // ACTION 7: UPLOAD BERKAS BUKTI SURAT KETERANGAN KE GOOGLE DRIVE
+    // Target Folder: 1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt
+    // =========================================================================
+    if (action === "uploadBuktiKetidakhadiran" || action === "uploadBukti") {
+      var fileData = data.fileData;
+      if (!fileData || !fileData.data) {
+        return ContentService.createTextOutput(JSON.stringify({
+          success: false,
+          error: "Data file bukti kosong atau tidak terbaca."
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var targetFolderId = (data.folder_id || "1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt").toString().trim();
+      var folder = null;
+      try {
+        folder = DriveApp.getFolderById(targetFolderId);
+      } catch (eF) {
+        folder = DriveApp.getRootFolder();
+      }
+
+      var rawData = fileData.data;
+      var contentType = "application/pdf";
+      var base64String = rawData;
+      if (rawData.indexOf(";base64,") !== -1) {
+        var parts = rawData.split(";base64,");
+        contentType = parts[0].replace("data:", "") || "application/pdf";
+        base64String = parts[1];
+      }
+
+      var decodedBytes = Utilities.base64Decode(base64String);
+      var originalName = fileData.name || "Surat_Keterangan.pdf";
+      var ext = ".pdf";
+      if (originalName.lastIndexOf(".") !== -1) {
+        ext = originalName.substring(originalName.lastIndexOf("."));
+      }
+      var teacherNameClean = (data.nama || "Guru").toString().replace(/[^a-zA-Z0-9]/g, "_");
+      var cleanFileName = "Bukti_" + teacherNameClean + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss") + ext;
+      var blob = Utilities.newBlob(decodedBytes, contentType, cleanFileName);
+
+      var createdFile = folder ? folder.createFile(blob) : DriveApp.createFile(blob);
+      try {
+        createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (eShare) {}
+
+      var fileUrl = createdFile.getUrl();
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: "Berkas surat bukti berhasil disimpan ke Google Drive (Folder: " + targetFolderId + ")!",
+        fileUrl: fileUrl,
+        fileId: createdFile.getId(),
+        fileName: cleanFileName
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(JSON.stringify({
       success: false,
       error: "Aksi tidak dikenali: " + action
@@ -824,6 +969,39 @@ function doGet(e) {
       });
     }
 
+    // 6. Data Ketidakhadiran
+    var sheetKet = getKetidakhadiranSheet(ss);
+    var rowsK = sheetKet.getDataRange().getValues();
+    var dataKetidakhadiran = [];
+    for (var k = 1; k < rowsK.length; k++) {
+      var rK = rowsK[k];
+      if (!rK[0] && !rK[1]) continue;
+      dataKetidakhadiran.push({
+        id: String(rK[0] || ("KTH-" + k)),
+        rowIndex: k + 1,
+        nip: String(rK[1] || ""),
+        nama: String(rK[2] || ""),
+        mapel: String(rK[3] || ""),
+        tanggal_awal: rK[4] instanceof Date ? Utilities.formatDate(rK[4], Session.getScriptTimeZone(), "yyyy-MM-dd") : String(rK[4] || ""),
+        tanggal_akhir: rK[5] instanceof Date ? Utilities.formatDate(rK[5], Session.getScriptTimeZone(), "yyyy-MM-dd") : String(rK[5] || ""),
+        jenis: String(rK[6] || "Izin"),
+        keterangan: String(rK[7] || ""),
+        inval_guru: String(rK[8] || ""),
+        kelas_terdampak: String(rK[9] || ""),
+        surat_bukti_url: String(rK[10] || ""),
+        status: String(rK[11] || "Disetujui"),
+        catatan_admin: String(rK[12] || ""),
+        created_at: String(rK[13] || "")
+      });
+    }
+
+    if (paramAction === "getKetidakhadiran") {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        data: dataKetidakhadiran
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     return ContentService.createTextOutput(JSON.stringify({
       success: true,
       message: "Data Penilaian Kinerja Diktendik berhasil dimuat",
@@ -832,7 +1010,8 @@ function doGet(e) {
       supervisi: dataSupervisi,
       absensi: dataAbsensi,
       yayasan: dataYayasan,
-      rapor: dataRapor
+      rapor: dataRapor,
+      ketidakhadiran: dataKetidakhadiran
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
@@ -869,12 +1048,28 @@ class PenilaianService {
   // Reliable check if a user is Headmaster (Kepala Sekolah)
   public isHeadmaster(user: User | null, config?: SchoolConfig): boolean {
     if (!user) return false;
-    const name = (user.nama || '').toLowerCase();
-    if (name.includes('abu haripin')) return true;
-    if (config?.headmaster_nip && user.nip === config.headmaster_nip) return true;
-    if (config?.headmaster && name.includes(config.headmaster.toLowerCase().trim())) return true;
-    if (user.nip === '03.18.10.49' || user.nip === '03.13.01.13' || user.nip === 'admin') return true;
-    if (user.role?.toLowerCase() === 'administrator') return true;
+    const name = (user.nama || '').toLowerCase().trim();
+    const nip = (user.nip || '').trim();
+    const role = (user.role || '').toLowerCase().trim();
+
+    if (nip === 'admin') return true;
+    if (role === 'kepala_sekolah' || role === 'kepala sekolah' || role.includes('kepala')) return true;
+
+    // Check config headmaster nip or nik
+    if (config?.headmaster_nip && nip === config.headmaster_nip.trim()) return true;
+    if (config?.headmaster_nik && nip === config.headmaster_nik.trim()) return true;
+
+    // Check config headmaster name
+    if (config?.headmaster) {
+      const headName = config.headmaster.toLowerCase().trim();
+      const cleanHead = headName.replace(/,\s*[a-z\.\s]+$/i, '').trim();
+      if ((cleanHead.length > 2 && name.includes(cleanHead)) || headName.includes(name)) return true;
+    }
+
+    // Default SMPIT Pondok Duta Headmaster
+    if (name.includes('abu haripin') || nip === '03.18.10.49' || nip === '03.13.01.13') return true;
+
+    if (role === 'administrator') return true;
     return false;
   }
 
@@ -890,8 +1085,7 @@ class PenilaianService {
           return parsed.filter((item: PenilaianItem) => {
             if (!item || !item.target_nip) return false;
             if (item.id && (item.id.startsWith('PAR-0') || item.id.startsWith('PAR-KS-'))) return false;
-            const targetName = (item.target_nama || '').toLowerCase();
-            return !targetName.includes('abu haripin') && item.target_nip !== '03.18.10.49' && item.target_nip !== '03.13.01.13';
+            return item.target_nip !== 'admin';
           });
         }
       }
@@ -1092,8 +1286,7 @@ class PenilaianService {
           .filter((item: any) => {
             if (!item || !item.target_nip) return false;
             if (item.id && (item.id.startsWith('PAR-0') || item.id.startsWith('PAR-KS-'))) return false;
-            const targetName = (item.target_nama || '').toLowerCase();
-            return !targetName.includes('abu haripin') && item.target_nip !== '03.18.10.49' && item.target_nip !== '03.13.01.13';
+            return item.target_nip !== 'admin';
           })
           .map((item: any, idx: number) => {
             let tgl = String(item.tanggal || '');
@@ -1129,7 +1322,12 @@ class PenilaianService {
           this.saveYayasanToStorage(this.yayasanItems);
         }
 
-        const totalSynced = remoteItems.length + (json.supervisi?.length || 0) + (json.absensi?.length || 0) + (json.yayasan?.length || 0);
+        // Sync Ketidakhadiran from Penilaian Spreadsheet if available
+        if (Array.isArray(json.ketidakhadiran) && json.ketidakhadiran.length > 0) {
+          dbService.replaceKetidakhadiran(json.ketidakhadiran);
+        }
+
+        const totalSynced = remoteItems.length + (json.supervisi?.length || 0) + (json.absensi?.length || 0) + (json.yayasan?.length || 0) + (json.ketidakhadiran?.length || 0);
         return { success: true, count: totalSynced };
       } else {
         return { success: false, count: 0, error: json?.error || 'Format respon script tidak sesuai.' };
@@ -1277,12 +1475,14 @@ class PenilaianService {
           item.semester === semester
       );
 
-      const targetColleagues = validTeachers.filter((t) => t.nip !== teacher.nip);
+      // Target yang dinilai: seluruh guru termasuk penilaian mandiri (diri sendiri)
+      const targetColleagues = validTeachers;
       const totalColleagues = targetColleagues.length;
       const countGiven = reviewsGiven.length;
       const percentage = totalColleagues > 0 ? Math.round((countGiven / totalColleagues) * 100) : 0;
       const hasFilled = countGiven > 0;
       const isComplete = countGiven >= totalColleagues && totalColleagues > 0;
+      const hasSelfEvaluated = reviewsGiven.some((r) => r.target_nip === teacher.nip);
 
       // Check if received reviews
       const reviewsReceived = this.items.filter(
@@ -1299,6 +1499,7 @@ class PenilaianService {
         teacher,
         hasFilled,
         isComplete,
+        hasSelfEvaluated,
         countGiven,
         totalColleagues,
         percentage,
@@ -1662,7 +1863,7 @@ class PenilaianService {
     }
   }
 
-  // Initialize all 5 sheets in Google Spreadsheet via Web App
+  // Initialize all 6 sheets in Google Spreadsheet via Web App
   public async initSheetsInGAS(gasUrl?: string): Promise<{ success: boolean; message: string }> {
     const targetGasUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
     if (!targetGasUrl || !targetGasUrl.startsWith('http')) {
@@ -1674,11 +1875,156 @@ class PenilaianService {
       const res = await fetch(initUrl);
       const json = await res.json().catch(() => null);
       if (json && json.success) {
-        return { success: true, message: json.message || '5 Sheet Database Penilaian berhasil disiapkan!' };
+        return { success: true, message: json.message || 'Seluruh 6 Sheet Database Penilaian & Ketidakhadiran berhasil disiapkan!' };
       }
       return { success: true, message: 'Permintaan inisialisasi sheet telah dikirim ke Google Apps Script.' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Gagal menginisialisasi sheet di Google Apps Script.' };
+    }
+  }
+
+  // =========================================================================
+  // 5. MANAJEMEN KETIDAKHADIRAN GURU & TENDIK (DATABASE PENILAIAN KINERJA)
+  // =========================================================================
+  public async fetchKetidakhadiran(gasUrl?: string): Promise<{ success: boolean; data: KetidakhadiranItem[]; message?: string }> {
+    const targetUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return { success: false, data: dbService.getKetidakhadiranList(), message: 'URL Google Apps Script belum dikonfigurasi.' };
+    }
+
+    try {
+      const fetchUrl = `${targetUrl}?action=getKetidakhadiran&t=${Date.now()}`;
+      const res = await fetch(fetchUrl);
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) {
+        if (json.data.length > 0) {
+          dbService.replaceKetidakhadiran(json.data);
+        }
+        return {
+          success: true,
+          data: json.data,
+          message: `✓ Berhasil memuat ${json.data.length} catatan ketidakhadiran dari Database Penilaian!`
+        };
+      }
+      return { success: false, data: dbService.getKetidakhadiranList(), message: json?.error || 'Format respon tidak sesuai.' };
+    } catch (err: any) {
+      return { success: false, data: dbService.getKetidakhadiranList(), message: err.message || 'Gagal menghubungi Google Apps Script Penilaian.' };
+    }
+  }
+
+  public async addKetidakhadiranToSpreadsheet(
+    item: KetidakhadiranItem,
+    gasUrl?: string
+  ): Promise<{ success: boolean; message: string; id?: string }> {
+    const targetUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return { success: false, message: 'URL Google Apps Script belum diisi.' };
+    }
+
+    try {
+      await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'addKetidakhadiran',
+          ketidakhadiranData: item
+        }),
+        mode: 'no-cors'
+      });
+      return { success: true, message: 'Catatan ketidakhadiran berhasil disimpan ke spreadsheet penilaian!' };
+    } catch (err: any) {
+      console.warn('Gagal menyimpan ketidakhadiran ke GAS:', err);
+      return { success: false, message: err.message || 'Gagal mengirim ke Google Apps Script.' };
+    }
+  }
+
+  public async updateKetidakhadiranInSpreadsheet(
+    item: KetidakhadiranItem,
+    gasUrl?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const targetUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return { success: false, message: 'URL Google Apps Script belum diisi.' };
+    }
+
+    try {
+      await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'updateKetidakhadiran',
+          ketidakhadiranData: item
+        }),
+        mode: 'no-cors'
+      });
+      return { success: true, message: 'Status ketidakhadiran berhasil diperbarui di spreadsheet penilaian!' };
+    } catch (err: any) {
+      console.warn('Gagal update ketidakhadiran ke GAS:', err);
+      return { success: false, message: err.message || 'Gagal update di Google Apps Script.' };
+    }
+  }
+
+  public async deleteKetidakhadiranFromSpreadsheet(
+    id: string,
+    rowIndex?: number,
+    gasUrl?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const targetUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return { success: false, message: 'URL Google Apps Script belum diisi.' };
+    }
+
+    try {
+      await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'deleteKetidakhadiran',
+          id,
+          rowIndex
+        }),
+        mode: 'no-cors'
+      });
+      return { success: true, message: 'Catatan ketidakhadiran berhasil dihapus dari spreadsheet penilaian!' };
+    } catch (err: any) {
+      console.warn('Gagal hapus ketidakhadiran dari GAS:', err);
+      return { success: false, message: err.message || 'Gagal menghapus dari Google Apps Script.' };
+    }
+  }
+
+  // Upload berkas bukti surat keterangan ke folder Google Drive: 1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt
+  public async uploadBuktiKetidakhadiran(
+    fileData: { name: string; data: string },
+    meta?: { nama?: string; nip?: string },
+    gasUrl?: string
+  ): Promise<{ success: boolean; fileUrl?: string; fileId?: string; fileName?: string; message: string }> {
+    const targetUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
+    const targetFolderId = '1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt';
+
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return { success: false, message: 'URL Google Apps Script belum dikonfigurasi.' };
+    }
+
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'uploadBuktiKetidakhadiran',
+          fileData,
+          folder_id: targetFolderId,
+          nama: meta?.nama,
+          nip: meta?.nip
+        })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      console.warn('Upload bukti ke GAS Penilaian notice:', err);
+      return {
+        success: false,
+        message: 'Gagal mengunggah file bukti ke Google Drive: ' + (err.message || String(err))
+      };
     }
   }
 

@@ -1930,7 +1930,7 @@ function deleteUsulanFromSheet(rowIndex) {
 
               <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/90 space-y-1 md:col-span-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-purple-900 block">Sheet &ldquo;Penilaian_Antar_Rekan&rdquo; (Spreadsheet Terpisah)</span>
+                  <span className="font-extrabold text-purple-900 block">Database Penilaian Kinerja &amp; Ketidakhadiran (Spreadsheet Terpisah)</span>
                   <a
                     href="https://docs.google.com/spreadsheets/d/1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY/edit"
                     target="_blank"
@@ -1942,7 +1942,10 @@ function deleteUsulanFromSheet(rowIndex) {
                   </a>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
-                  Spreadsheet ID: 1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY • Kolom: Timestamp, Tahun Ajaran, Semester, Peran Penilai, NIP/Nama Penilai, NIP/Nama Target, P1-P8 Skor, Rata-rata Skor, Catatan
+                  Spreadsheet ID: 1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY • Sheet: Penilaian_Antar_Rekan, Supervisi, Absensi_Disiplin, Kegiatan_Yayasan, Rapor_Diktendik, Ketidakhadiran.
+                </p>
+                <p className="text-[10px] text-purple-700 font-medium mt-0.5">
+                  Dipisahkan dari database utama agar lalu lintas berkas perangkat pembelajaran tetap ringan dan performa pencatatan selalu prima.
                 </p>
               </div>
             </div>

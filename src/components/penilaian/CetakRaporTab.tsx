@@ -36,17 +36,23 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
   refreshTrigger,
   initialSelectedTeacher,
 }) => {
+  // Jika akun Guru: HANYA bisa melihat dan mencetak rapor diri sendiri
+  const isTeacherOnly = !isAdmin;
+
   const evaluatedTeachers = allTeachers.filter(
     (t) => t.nip !== 'admin' && t.nama && t.nama.trim().length > 2 && !penilaianService.isHeadmaster(t, config)
   );
 
   const [selectedNip, setSelectedNip] = useState<string>(() => {
+    if (isTeacherOnly && currentUser) return currentUser.nip;
     if (initialSelectedTeacher) return initialSelectedTeacher.nip;
-    if (!isAdmin && currentUser) return currentUser.nip;
     return evaluatedTeachers[0]?.nip || '';
   });
 
-  const selectedTeacher = evaluatedTeachers.find((t) => t.nip === selectedNip) || evaluatedTeachers[0] || null;
+  // Untuk akun guru, selectedTeacher WAJIB terkunci hanya ke akun dirinya sendiri (currentUser)
+  const selectedTeacher: User | null = isTeacherOnly
+    ? currentUser
+    : (evaluatedTeachers.find((t) => t.nip === selectedNip) || initialSelectedTeacher || evaluatedTeachers[0] || null);
 
   const raporData = selectedTeacher
     ? penilaianService.calculateSingleRaporDiktendik(selectedTeacher, academicYear, semester)
@@ -180,33 +186,18 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
     doc.setFont('helvetica', 'normal');
     doc.text(raporData.catatanYayasan || 'Pertahankan dedikasi amanah mengajar, integritas dakwah, dan kedisiplinan berakhlak mulia di lingkungan SMPIT Pondok Duta.', 14, finalTableY + 12, { maxWidth: pageWidth - 28 });
 
-    // Tanda Tangan 3 Kolom
-    const signY = finalTableY + 24;
-    const col1 = 30;
-    const col2 = pageWidth / 2;
-    const col3 = pageWidth - 45;
+    // Tanda Tangan: Hanya Kepala Sekolah Saja
+    const signY = finalTableY + 22;
+    const colRight = pageWidth - 50;
 
-    doc.setFontSize(8);
-    doc.text(`Depok, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, col3, signY - 5, { align: 'center' });
-
-    doc.text('Pendidik yang Dinilai,', col1, signY, { align: 'center' });
-    doc.text('Mengetahui,\nKetua Yayasan Pondok Duta,', col2, signY, { align: 'center' });
-    doc.text('Kepala Sekolah,', col3, signY, { align: 'center' });
+    doc.setFontSize(8.5);
+    doc.text(`Depok, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, colRight, signY, { align: 'center' });
+    doc.text('Kepala Sekolah,', colRight, signY + 5, { align: 'center' });
 
     doc.setFont('helvetica', 'bold');
-    doc.text(selectedTeacher.nama, col1, signY + 22, { align: 'center' });
+    doc.text(config.headmaster || 'Abu Haripin, M.Pd', colRight, signY + 24, { align: 'center' });
     doc.setFont('helvetica', 'normal');
-    doc.text(`NIP: ${selectedTeacher.nip}`, col1, signY + 26, { align: 'center' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Pengurus Yayasan', col2, signY + 22, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.text('Pondok Duta Depok', col2, signY + 26, { align: 'center' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.text(config.headmaster || 'Abu Haripin, M.Pd', col3, signY + 22, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.text(`NIP: ${config.headmaster_nip || '03.18.10.49'}`, col3, signY + 26, { align: 'center' });
+    doc.text(`NIP: ${config.headmaster_nip || '03.18.10.49'}`, colRight, signY + 28, { align: 'center' });
 
     doc.save(`Rapor_Diktendik_${selectedTeacher.nama.replace(/[^a-zA-Z0-9]/g, '_')}_${academicYear.replace('/', '_')}.pdf`);
   };
@@ -215,24 +206,23 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
     <div className="space-y-6">
       {/* Teacher Picker & Navigation Bar (hidden on print) */}
       <div className="no-print bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-slate-700 shrink-0">
-            Pilih Diktendik:
-          </label>
-          <select
-            value={selectedNip}
-            onChange={(e) => setSelectedNip(e.target.value)}
-            disabled={!isAdmin && currentUser?.nip !== selectedNip}
-            className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-white focus:border-purple-600 outline-none cursor-pointer min-w-[220px]"
-          >
-            {evaluatedTeachers.map((t) => (
-              <option key={t.nip} value={t.nip}>
-                {t.nama} ({t.mapel || 'Guru'})
-              </option>
-            ))}
-          </select>
+        {isAdmin ? (
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-slate-700 shrink-0">
+              Pilih Diktendik:
+            </label>
+            <select
+              value={selectedNip}
+              onChange={(e) => setSelectedNip(e.target.value)}
+              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-white focus:border-purple-600 outline-none cursor-pointer min-w-[220px]"
+            >
+              {evaluatedTeachers.map((t) => (
+                <option key={t.nip} value={t.nip}>
+                  {t.nama} ({t.mapel || 'Guru'})
+                </option>
+              ))}
+            </select>
 
-          {isAdmin && (
             <div className="flex items-center gap-1">
               <button
                 onClick={handlePrev}
@@ -251,8 +241,22 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
                 <ChevronRight className="w-4 h-4 text-slate-600" />
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                Lembar Rapor Kinerja Pribadi Anda
+              </span>
+              <strong className="text-xs font-black text-slate-900 block">
+                {currentUser?.nama || 'Guru'} <span className="font-normal text-slate-500 font-mono">({currentUser?.nip})</span>
+              </strong>
+            </div>
+          </div>
+        )}
 
         {/* Print & Download buttons */}
         <div className="flex items-center gap-2">
@@ -531,39 +535,19 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
             </p>
           </div>
 
-          {/* TANDA TANGAN RESMI TIGA PIHAK */}
-          <div className="pt-4 border-t border-slate-200 text-xs">
-            <div className="text-right mb-4">
-              <span className="font-medium text-slate-600">
+          {/* TANDA TANGAN RESMI: HANYA KEPALA SEKOLAH SAJA */}
+          <div className="pt-4 border-t border-slate-200 text-xs flex justify-end">
+            <div className="text-center min-w-[220px]">
+              <p className="font-medium text-slate-600 mb-1">
                 Depok, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-6 text-center">
-              <div>
-                <p className="font-medium text-slate-600 mb-16">Pendidik yang Dinilai,</p>
-                <p className="font-bold text-slate-900 underline underline-offset-4">{selectedTeacher.nama}</p>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.5">NIP: {selectedTeacher.nip}</p>
-              </div>
-
-              <div>
-                <p className="font-medium text-slate-600 mb-16">
-                  Mengetahui,<br />
-                  Ketua Yayasan Pondok Duta,
-                </p>
-                <p className="font-bold text-slate-900 underline underline-offset-4">Pengurus Yayasan</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Pondok Duta Depok</p>
-              </div>
-
-              <div>
-                <p className="font-medium text-slate-600 mb-16">Kepala Sekolah,</p>
-                <p className="font-bold text-slate-900 underline underline-offset-4">
-                  {config.headmaster || 'Abu Haripin, M.Pd'}
-                </p>
-                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                  NIP: {config.headmaster_nip || '03.18.10.49'}
-                </p>
-              </div>
+              </p>
+              <p className="font-medium text-slate-600 mb-20">Kepala Sekolah,</p>
+              <p className="font-bold text-slate-900 underline underline-offset-4 text-sm">
+                {config.headmaster || 'Abu Haripin, M.Pd'}
+              </p>
+              <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                NIP: {config.headmaster_nip || '03.18.10.49'}
+              </p>
             </div>
           </div>
         </div>

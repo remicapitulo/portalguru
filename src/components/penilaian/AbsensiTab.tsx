@@ -24,7 +24,8 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
   activeGasUrl,
   onDataUpdated,
 }) => {
-  const canEdit = isAdmin;
+  const isTeacher = currentUser?.role?.toLowerCase() === 'guru';
+  const canEdit = isAdmin && !isTeacher;
 
   const evaluatedTeachers = allTeachers.filter(
     (t) => t.nip !== 'admin' && t.nama && t.nama.trim().length > 2 && !penilaianService.isHeadmaster(t, config)

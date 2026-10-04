@@ -106,6 +106,28 @@ export interface SchoolConfig {
   penilaian_apps_script_url?: string;
 }
 
+export type JenisKetidakhadiran = 'Sakit' | 'Izin' | 'Cuti' | 'Dinas Luar' | 'Lainnya';
+export type StatusKetidakhadiran = 'Menunggu' | 'Menunggu Verifikasi' | 'Disetujui' | 'Ditolak' | 'Diverifikasi';
+
+export interface KetidakhadiranItem {
+  id: string;
+  rowIndex?: number;
+  nip: string;
+  nama: string;
+  mapel?: string;
+  tanggal_awal: string; // YYYY-MM-DD
+  tanggal_akhir?: string; // YYYY-MM-DD
+  jenis: JenisKetidakhadiran;
+  keterangan: string;
+  inval_guru?: string; // Guru pengganti jika ada KBM
+  kelas_terdampak?: string; // e.g. Kelas 7A, 8B
+  surat_bukti_url?: string; // URL surat dokter / tugas / izin
+  surat_bukti_name?: string;
+  status: StatusKetidakhadiran;
+  catatan_admin?: string;
+  created_at: string;
+}
+
 export interface AppDatabase {
   config: SchoolConfig;
   users: User[];
@@ -113,6 +135,7 @@ export interface AppDatabase {
   uploadRecords: UploadRecord[];
   usulanList: UsulanItem[];
   jurnalList: JurnalItem[];
+  ketidakhadiranList: KetidakhadiranItem[];
   lastUpdated: string;
   lastSyncTime?: string;
   syncStatus?: 'connected' | 'syncing' | 'error' | 'idle';

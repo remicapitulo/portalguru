@@ -15,7 +15,8 @@ import {
   GraduationCap,
   ChevronLeft,
   Award,
-  Share2
+  Share2,
+  CalendarX
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -26,6 +27,7 @@ export type NavItem =
   | 'usulan'
   | 'jurnal'
   | 'eflayer'
+  | 'ketidakhadiran'
   | 'penilaian'
   | 'data-guru'
   | 'db-manager';
@@ -105,6 +107,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: <Share2 className="w-5 h-5 text-fuchsia-400 shrink-0" />,
       badge: 'Sosmed',
       badgeColor: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
+    },
+    {
+      id: 'ketidakhadiran',
+      label: 'Daftar Ketidakhadiran',
+      shortLabel: 'Ketidakhadiran',
+      icon: <CalendarX className="w-5 h-5 text-rose-400 shrink-0" />,
+      badge: 'Izin/Sakit',
+      badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
     },
     {
       id: 'penilaian',

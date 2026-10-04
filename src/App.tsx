@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dbService } from './db/storage';
 import { spreadsheetService } from './db/spreadsheetService';
+import { penilaianService } from './db/penilaianService';
 import { AppDatabase, User } from './types';
 import { Navbar } from './components/Navbar';
 import { Sidebar, NavItem } from './components/Sidebar';
@@ -15,6 +16,7 @@ import { DatabaseManagerView } from './components/DatabaseManagerView';
 import { ReportPrintView } from './components/ReportPrintView';
 import { UpdateEflyerView } from './components/UpdateEflyerView';
 import { PenilaianView } from './components/PenilaianView';
+import { KetidakhadiranView } from './components/KetidakhadiranView';
 
 export default function App() {
   const [db, setDb] = useState<AppDatabase>(dbService.getDatabase());
@@ -33,9 +35,14 @@ export default function App() {
       setDb({ ...updatedDb });
     });
 
-    // Initial background sync from Google Spreadsheet
+    // Initial background sync from Google Spreadsheet (Main DB & Penilaian DB)
     spreadsheetService.syncAll().catch((err) => {
       console.warn('Initial spreadsheet sync warning:', err);
+    });
+
+    const activePenilaianGasUrl = db.config.penilaian_apps_script_url;
+    penilaianService.syncFromGAS(activePenilaianGasUrl).catch((err) => {
+      console.warn('Initial penilaian spreadsheet sync warning:', err);
     });
 
     return unsubscribe;
@@ -176,6 +183,15 @@ export default function App() {
               currentUser={currentUser}
               db={db}
               config={db.config}
+            />
+          )}
+
+          {currentTab === 'ketidakhadiran' && (
+            <KetidakhadiranView
+              currentUser={currentUser}
+              config={db.config}
+              allTeachers={teachers}
+              ketidakhadiranList={db.ketidakhadiranList || []}
             />
           )}
 

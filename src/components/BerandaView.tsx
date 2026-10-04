@@ -14,7 +14,8 @@ import {
   CalendarCheck,
   Award,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  CalendarX
 } from 'lucide-react';
 import { User, AcademicEvent, SchoolConfig, AppDatabase } from '../types';
 import { NavItem } from './Sidebar';
@@ -265,7 +266,7 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
       </section>
 
       {/* QUICK METRICS OVERVIEW */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
         {/* 1. Total Guru */}
         <div
           onClick={() => onNavigate(isAdmin ? 'data-guru' : 'perangkat')}
@@ -325,7 +326,7 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
               <span className="text-xl sm:text-2xl font-black text-purple-600">{avgProgress}%</span>
             </div>
             <span className="text-[9.5px] sm:text-[10px] text-purple-700 font-semibold block truncate mt-0.5">
-              <span className="sm:hidden">{totalBerkas} Berkas Masuk</span>
+              <span className="sm:hidden">{totalBerkas} Berkas</span>
               <span className="hidden sm:inline">{totalBerkas} Berkas Terverifikasi</span>
             </span>
           </div>
@@ -347,8 +348,28 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
               <span className="text-[10px] sm:text-xs font-bold text-slate-500">Agenda</span>
             </div>
             <span className="text-[9.5px] sm:text-[10px] text-sky-700 font-semibold block truncate mt-0.5">
-              <span className="sm:hidden">{h30Events.length} dlm 30 Hari</span>
-              <span className="hidden sm:inline">{h30Events.length} dlm 30 Hari • Total {events.length} Kaldik</span>
+              <span>{h30Events.length} dlm 30 Hari</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 5. Daftar Ketidakhadiran */}
+        <div
+          onClick={() => onNavigate('ketidakhadiran')}
+          className="col-span-2 lg:col-span-1 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-rose-300 hover:shadow-md transition cursor-pointer flex items-center gap-2.5 sm:gap-4 group min-w-0"
+          title="Klik untuk membuka Daftar Ketidakhadiran Guru"
+        >
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-rose-50 group-hover:bg-rose-100 text-rose-600 flex items-center justify-center font-bold transition shrink-0">
+            <CalendarX className="w-5 h-5 sm:w-6 sm:h-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[11px] sm:text-xs text-slate-500 block font-medium truncate">Ketidakhadiran</span>
+            <div className="flex items-baseline gap-1 sm:gap-1.5">
+              <span className="text-xl sm:text-2xl font-black text-rose-700">{db.ketidakhadiranList ? db.ketidakhadiranList.length : 0}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-500">Catatan</span>
+            </div>
+            <span className="text-[9.5px] sm:text-[10px] text-rose-700 font-semibold block truncate mt-0.5">
+              <span>Rekap Izin / Sakit</span>
             </span>
           </div>
         </div>

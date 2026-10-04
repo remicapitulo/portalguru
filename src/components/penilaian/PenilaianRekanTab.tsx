@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Award, Users, CheckCircle2, AlertCircle, Check, Info, ShieldCheck } from 'lucide-react';
+import { Award, Users, CheckCircle2, AlertCircle, Check, Info, ShieldCheck, Lock } from 'lucide-react';
 import { User, SchoolConfig, SemesterType } from '../../types';
 import {
   penilaianService,
@@ -38,13 +38,29 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
     );
   }, [allTeachers]);
 
-  // Kepala sekolah di-hide dari daftar target yang dinilai rekan
+  // Target guru yang dinilai: Rekan sejawat (Kepala Sekolah TIDAK diikutsertakan)
   const targetTeachersList = useMemo(() => {
-    return teachersList.filter((t) => {
-      if (currentUser && t.nip === currentUser.nip) return false;
+    // 1. Ambil seluruh rekan guru yang dinilai; Kepala Sekolah TIDAK diikutsertakan dalam penilaian antar rekan
+    const list = teachersList.filter((t) => {
       if (penilaianService.isHeadmaster(t, config)) return false;
       return true;
     });
+
+    // 2. Guru yang sedang login (jika bukan kepala sekolah) diizinkan menilai diri sendiri
+    if (currentUser && !penilaianService.isHeadmaster(currentUser, config)) {
+      const exists = list.some((t) => t.nip === currentUser.nip);
+      if (!exists && currentUser.nip && currentUser.nama) {
+        list.unshift(currentUser);
+      } else {
+        const selfIndex = list.findIndex((t) => t.nip === currentUser.nip);
+        if (selfIndex > 0) {
+          const [self] = list.splice(selfIndex, 1);
+          list.unshift(self);
+        }
+      }
+    }
+
+    return list;
   }, [teachersList, currentUser, config]);
 
   const [evaluatorRole, setEvaluatorRole] = useState<'guru' | 'kepala_sekolah'>(
@@ -136,7 +152,7 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
       return;
     }
     if (filledIndicatorsCount < 8) {
-      setSaveError(`Mohon tentukan nilai untuk semua 8 indikator penilaian (saat ini baru ${filledIndicatorsCount} dari 8 terisi).`);
+      setSaveError(`Wajib menjawab semua 8 pertanyaan penilaian. Jawaban tidak boleh ada yang kosong (saat ini baru ${filledIndicatorsCount} dari 8 terisi).`);
       return;
     }
 
@@ -164,8 +180,11 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
         ? ' serta otomatis tersimpan ke Google Spreadsheet.'
         : '.';
 
+      const isSelf = currentUser && selectedTargetTeacher.nip === currentUser.nip;
+      const targetLabel = isSelf ? 'mandiri (diri sendiri)' : selectedTargetTeacher.nama;
+
       setSaveSuccess(
-        `✓ Penilaian untuk ${selectedTargetTeacher.nama} berhasil disimpan dengan skor rata-rata ${saved.rata_rata}${gasInfo}`
+        `✓ Penilaian ${targetLabel} berhasil disimpan dengan skor rata-rata ${saved.rata_rata}${gasInfo}`
       );
       onDataUpdated();
 
@@ -237,21 +256,40 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              Nama Guru yang Dinilai <span className="text-rose-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Nama Guru yang Dinilai <span className="text-rose-500">*</span>
+              </label>
+              {currentUser && !penilaianService.isHeadmaster(currentUser, config) && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectTarget(currentUser.nip)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                    targetTeacherNip === currentUser.nip
+                      ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                  }`}
+                  title="Klik untuk langsung menilai diri sendiri"
+                >
+                  <span className="text-amber-500 font-black">★</span>
+                  <span>Nilai Diri Sendiri</span>
+                </button>
+              )}
+            </div>
             <select
               value={targetTeacherNip}
               onChange={(e) => handleSelectTarget(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-purple-600 outline-none transition cursor-pointer"
             >
-              <option value="">-- Pilih Rekan Guru --</option>
+              <option value="">-- Pilih Rekan Guru {currentUser && !penilaianService.isHeadmaster(currentUser, config) ? '/ Diri Sendiri' : ''} --</option>
               {targetTeachersList.map((t) => {
                 const isEvaluated = userEvaluatedNips.has(t.nip);
+                const isSelf = currentUser && t.nip === currentUser.nip;
                 return (
                   <option key={t.nip} value={t.nip}>
                     {isEvaluated ? '✓ [Sudah Dinilai] ' : '○ [Belum Dinilai] '}
-                    {t.nama} ({t.mapel || 'Guru'})
+                    {isSelf ? '★ [Nilai Diri Sendiri] ' : ''}
+                    {t.nama} {isSelf ? '(Saya Sendiri)' : `(${t.mapel || 'Guru'})`}
                   </option>
                 );
               })}
@@ -285,6 +323,7 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
             {targetTeachersList.map((t) => {
               const isEvaluated = userEvaluatedNips.has(t.nip);
               const isSelected = targetTeacherNip === t.nip;
+              const isSelf = currentUser && t.nip === currentUser.nip;
               return (
                 <button
                   type="button"
@@ -295,21 +334,38 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
                       ? 'bg-purple-700 text-white shadow-xs'
                       : isEvaluated
                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                      : isSelf
+                      ? 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
                       : 'bg-white text-slate-700 border border-slate-200 hover:border-purple-300'
                   }`}
                 >
                   {isEvaluated ? (
                     <CheckCircle2 className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-emerald-600'}`} />
+                  ) : isSelf ? (
+                    <span className={`text-xs ${isSelected ? 'text-white' : 'text-amber-600 font-black'}`}>★</span>
                   ) : (
-                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-amber-400'}`} />
+                    <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-slate-300'}`} />
                   )}
-                  <span>{t.nama.split(',')[0]}</span>
+                  <span>{isSelf ? `${t.nama.split(',')[0]} (Diri Sendiri)` : t.nama.split(',')[0]}</span>
                 </button>
               );
             })}
           </div>
         </div>
       </div>
+
+      {/* Banner Khusus Penilaian Diri Sendiri */}
+      {selectedTargetTeacher && currentUser && selectedTargetTeacher.nip === currentUser.nip && (
+        <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl text-xs text-amber-950 flex items-start gap-3 shadow-xs animate-in fade-in">
+          <span className="text-xl text-amber-600 mt-0.5">★</span>
+          <div className="space-y-1">
+            <h4 className="font-black text-amber-900 text-sm">Mode Penilaian Diri Sendiri (Self-Assessment) Aktif</h4>
+            <p className="text-amber-800 leading-relaxed">
+              Anda sedang melakukan evaluasi mandiri atas kinerja dan keteladanan Anda selama <strong>1 Tahun Kalender {academicYear}</strong>. Berikan penilaian yang objektif, jujur, dan reflektif demi pengembangan kompetensi diri berkelanjutan.
+            </p>
+          </div>
+        </div>
+      )}
 
       {saveSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
@@ -332,29 +388,34 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
             <div className="p-5 sm:p-7 border-b border-slate-100 bg-gradient-to-r from-purple-50/50 to-white">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-1.5">
-                    <span>{selectedTargetTeacher.nama}</span>
-                    <span className="text-rose-500 font-black">*</span>
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-1.5">
+                      <span>{selectedTargetTeacher.nama}</span>
+                      <span className="text-rose-500 font-black">*</span>
+                    </h3>
+                    {currentUser && selectedTargetTeacher.nip === currentUser.nip && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                        <span>★</span>
+                        <span>Penilaian Diri Sendiri (Self-Assessment)</span>
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Mapel: <strong className="text-slate-700">{selectedTargetTeacher.mapel || 'Guru'}</strong> • NIP: {selectedTargetTeacher.nip}
                   </p>
+                  {currentUser && selectedTargetTeacher.nip === currentUser.nip && (
+                    <p className="text-[11px] text-amber-900 mt-1.5 font-medium bg-amber-50/90 px-3 py-1.5 rounded-xl border border-amber-200 inline-block">
+                      ★ <strong>Refleksi Mandiri</strong>: Anda sedang mengisi evaluasi diri sendiri terhadap 8 indikator sikap, etika, dan keteladanan.
+                    </p>
+                  )}
                 </div>
 
-                {filledIndicatorsCount === 8 ? (
+                {filledIndicatorsCount === 8 && (
                   <div className="flex items-center gap-2 self-start sm:self-auto bg-purple-100/70 border border-purple-200 px-3.5 py-1.5 rounded-2xl">
                     <span className="text-[11px] font-bold text-purple-900">Rata-rata Skor:</span>
                     <span className="text-sm font-black text-purple-700">{liveAverage}</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-700 text-white">
                       {liveAverage >= 91 ? 'Amat Baik' : liveAverage >= 81 ? 'Baik' : 'Cukup'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 self-start sm:self-auto bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-2xl">
-                    <span className="text-[11px] font-bold text-amber-900">Progres Penilaian:</span>
-                    <span className="text-xs font-black text-amber-800">{filledIndicatorsCount} dari 8</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                      {filledIndicatorsCount === 0 ? 'Mulai dari Nol' : `${8 - filledIndicatorsCount} indikator lagi`}
                     </span>
                   </div>
                 )}
@@ -457,24 +518,48 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
               </div>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <Info className="w-4 h-4 text-purple-500 shrink-0" />
-                  <span>
-                    {evaluatorRole === 'kepala_sekolah'
-                      ? 'Tersimpan sebagai Penilaian Penyeimbang Resmi Kepala Sekolah.'
-                      : 'Penilaian Anda bersifat rahasia dan dirata-ratakan dalam Rapor Diktendik.'}
-                  </span>
+                <div className="flex items-center gap-2 text-xs">
+                  {filledIndicatorsCount < 8 ? (
+                    <div className="flex items-center gap-2 text-amber-800 bg-amber-50 px-3.5 py-1.5 rounded-xl border border-amber-200">
+                      <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>
+                        <strong>Wajib Dijawab 8 Pertanyaan</strong>: Lengkapi seluruh pertanyaan untuk membuka tombol simpan ({8 - filledIndicatorsCount} pertanyaan belum dijawab).
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-emerald-800 bg-emerald-50 px-3.5 py-1.5 rounded-xl border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>
+                        Seluruh 8 pertanyaan telah lengkap terisi. Silakan simpan penilaian.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="px-6 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  disabled={filledIndicatorsCount < 8 || submitting}
+                  className={`px-6 py-3 rounded-xl font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 ${
+                    filledIndicatorsCount === 8 && !submitting
+                      ? 'bg-purple-700 hover:bg-purple-800 text-white cursor-pointer active:scale-[0.99]'
+                      : 'bg-slate-200 border border-slate-300 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
+                  title={
+                    filledIndicatorsCount < 8
+                      ? `Tombol terkunci: Wajib menjawab semua 8 pertanyaan (saat ini ${filledIndicatorsCount}/8).`
+                      : 'Simpan penilaian'
+                  }
                 >
-                  <Check className="w-4 h-4" />
+                  {filledIndicatorsCount === 8 ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-slate-400" />
+                  )}
                   <span>
                     {submitting
                       ? 'Menyimpan...'
+                      : filledIndicatorsCount < 8
+                      ? `Tombol Terkunci (Wajib 8 Pertanyaan Terisi: ${filledIndicatorsCount}/8)`
                       : `Simpan Penilaian (${selectedTargetTeacher.nama.split(',')[0]})`}
                   </span>
                 </button>

@@ -57,11 +57,20 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
   const [syncingGAS, setSyncingGAS] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const isTeacher = currentUser?.role?.toLowerCase() === 'guru';
+  const canSeeAll = isAdmin && !isTeacher;
+
   const evaluatedTeachers = useMemo(() => {
-    return allTeachers.filter(
+    const baseList = allTeachers.filter(
       (t) => t.nip !== 'admin' && t.nama && t.nama.trim().length > 2 && !penilaianService.isHeadmaster(t, config)
     );
-  }, [allTeachers, config]);
+    // Guru HANYA bisa melihat dan mencetak rapor diri sendiri, tidak bisa melihat guru lain
+    if (!canSeeAll && currentUser) {
+      const selfList = baseList.filter((t) => t.nip === currentUser.nip);
+      return selfList.length > 0 ? selfList : [currentUser];
+    }
+    return baseList;
+  }, [allTeachers, config, canSeeAll, currentUser]);
 
   const raporList = useMemo(() => {
     return penilaianService.calculateRaporDiktendik(evaluatedTeachers, academicYear, semester);
@@ -591,7 +600,7 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
                 </span>
                 <h3 className="text-lg font-black text-white">{selectedDetail.teacher.nama}</h3>
                 <p className="text-xs text-purple-200 mt-0.5">
-                  NIP: {selectedDetail.teacher.nip} • Mapel: {selectedDetail.teacher.mapel || 'Guru'} • TA {academicYear} ({semester})
+                  NIP: {selectedDetail.teacher.nip} • Mapel: {selectedDetail.teacher.mapel || 'Guru'} • TA {academicYear} (1 Tahun Kalender Penuh)
                 </p>
               </div>
               <button

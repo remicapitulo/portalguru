@@ -26,7 +26,8 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
 }) => {
   // Access control: Guru hanya bisa melihat dirinya sendiri.
   // Input oleh admin / kepala sekolah / wakil kepala sekolah.
-  const canEdit = Boolean(
+  const isTeacher = currentUser?.role?.toLowerCase() === 'guru';
+  const canEdit = !isTeacher && Boolean(
     isAdmin ||
     (currentUser && (
       (config.vice_headmaster_nip && currentUser.nip === config.vice_headmaster_nip) ||
