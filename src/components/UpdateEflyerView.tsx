@@ -137,9 +137,6 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
         currentUser.role.toLowerCase() === 'administrator' ||
         currentUser.role.toLowerCase().includes('admin')
       )) ||
-      currentUser.nip?.toLowerCase() === 'admin' ||
-      currentUser.email?.toLowerCase().includes('admin') ||
-      (currentUser.nama && currentUser.nama.toLowerCase().includes('abu haripin')) ||
       (config.headmaster_nip && currentUser.nip === config.headmaster_nip)
     )
   );

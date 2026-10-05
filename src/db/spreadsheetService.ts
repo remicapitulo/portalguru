@@ -205,7 +205,7 @@ class GoogleSpreadsheetService {
               nama: fullName,
               mapel: u.mapel || u.subject || 'Guru Mapel',
               role: u.role || 'Guru',
-              password: u.password || 'guru123',
+              password: u.password !== undefined && u.password !== null ? String(u.password).trim() : '',
               avatar: fullName ? fullName.charAt(0).toUpperCase() : 'G',
               nip_aliases: [cleanNip, `T-${cleanNip}`, fullName]
             };
@@ -307,36 +307,78 @@ class GoogleSpreadsheetService {
     }
   }
 
-  // 4. Login via Google Apps Script (Sheet "user")
+  // 4. Login via Google Spreadsheet (Sheet "user")
   public async loginViaSpreadsheet(nip: string, password: string): Promise<{
     success: boolean;
     user?: User;
     message: string;
   }> {
-    try {
-      const res = await fetch(this.getApiUrl(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'login', nip, password }),
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        const userObj: User = {
-          id: `USR-${data.user.nip}`,
-          nip: data.user.nip,
-          nama: data.user.nama,
-          role: data.user.role || 'Guru',
-          mapel: data.user.mapel || 'Guru Mata Pelajaran',
-          avatar: data.user.nama ? data.user.nama.charAt(0).toUpperCase() : 'G'
-        };
-        return { success: true, user: userObj, message: `Selamat datang, ${data.user.nama}` };
-      }
-      return { success: false, message: data.message || 'NIK atau Password salah!' };
-    } catch (err: any) {
-      console.warn('Spreadsheet login failed, checking local directory:', err);
-      // Fallback to local authentication
-      return dbService.authenticate(nip, password);
+    const cleanNip = String(nip || '').trim();
+    const cleanPass = String(password || '').trim();
+
+    if (!cleanNip || !cleanPass) {
+      return { success: false, message: 'NIK / NIP dan Password wajib diisi!' };
     }
+
+    try {
+      // 1. Selalu ambil data terbaru secara live langsung dari Google Spreadsheet sheet "user"
+      const usersRes = await this.fetchUsers();
+      if (usersRes.success && Array.isArray(usersRes.data) && usersRes.data.length > 0) {
+        // Map dan simpan seluruh pengguna ke database lokal
+        const mappedUsers: User[] = usersRes.data
+          .filter((u: any) => u && (u.nama || u.name) && u.nip)
+          .map((u: any, i: number) => {
+            const rawNip = String(u.nip || '').trim();
+            const cleanUserNip = rawNip.replace(/^T-|^USR-/, '').trim();
+            const fullName = u.nama || u.name;
+            return {
+              id: cleanUserNip ? `USR-${cleanUserNip}` : `USR-${i + 1}`,
+              nip: cleanUserNip,
+              nama: fullName,
+              mapel: u.mapel || u.subject || 'Guru Mapel',
+              role: u.role || 'Guru',
+              password: u.password !== undefined && u.password !== null ? String(u.password).trim() : '',
+              avatar: fullName ? fullName.charAt(0).toUpperCase() : 'G',
+              nip_aliases: [cleanUserNip, rawNip, `T-${cleanUserNip}`, fullName]
+            };
+          });
+
+        dbService.replaceUsers(mappedUsers);
+
+        // Cari user yang cocok berdasarkan NIK/NIP atau alias
+        const target = cleanNip.toLowerCase();
+        const matched = mappedUsers.find((u) => {
+          const uNip = u.nip.toLowerCase().trim();
+          return (
+            uNip === target ||
+            (u.nip_aliases && u.nip_aliases.some((a) => a.toLowerCase().trim() === target))
+          );
+        });
+
+        if (!matched) {
+          return { success: false, message: 'NIK / NIP tidak terdaftar di database spreadsheet!' };
+        }
+
+        // VERIFIKASI KETAT PASSWORD: Wajib sama persis dengan yang tersimpan di kolom Password database
+        if (String(matched.password || '').trim() !== cleanPass) {
+          return {
+            success: false,
+            message: 'Password salah! Pastikan password sesuai dengan yang tersimpan di database spreadsheet.'
+          };
+        }
+
+        return {
+          success: true,
+          user: matched,
+          message: `Selamat datang, ${matched.nama}`
+        };
+      }
+    } catch (err: any) {
+      console.warn('Real-time spreadsheet fetch failed during login, checking local storage:', err);
+    }
+
+    // Fallback jika koneksi internet terputus (offline)
+    return dbService.authenticate(cleanNip, cleanPass);
   }
 
   // 5. Add Usulan to Sheet "Usulan_Guru"

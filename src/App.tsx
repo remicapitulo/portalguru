@@ -72,19 +72,24 @@ export default function App() {
         currentUser.role.toLowerCase() === 'administrator' ||
         currentUser.role.toLowerCase().includes('admin')
       )) ||
-      currentUser.nip?.toLowerCase() === 'admin' ||
-      currentUser.email?.toLowerCase().includes('admin') ||
-      (currentUser.nama && currentUser.nama.toLowerCase().includes('abu haripin')) ||
       (db.config.headmaster_nip && currentUser.nip === db.config.headmaster_nip)
     )
   );
 
-  // Route-guard: Automatically redirect non-admin (Role: Guru) back to Beranda if attempting to open restricted menus
+  const normalizedUserRole = (currentUser?.role || 'Guru').toLowerCase().trim();
+  const isTendikOrOB = normalizedUserRole === 'tendik' || normalizedUserRole === 'ob';
+
+  // Route-guard: Automatically redirect users back to Beranda if attempting to open restricted menus
   useEffect(() => {
     if (!isAdmin && (currentTab === 'data-guru' || currentTab === 'db-manager' || currentTab === 'report-print')) {
       setCurrentTab('beranda');
+      return;
     }
-  }, [isAdmin, currentTab]);
+    if (isTendikOrOB && (currentTab === 'perangkat' || currentTab === 'jurnal')) {
+      setCurrentTab('beranda');
+      return;
+    }
+  }, [isAdmin, isTendikOrOB, currentTab]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex antialiased text-slate-900 selection:bg-blue-600 selection:text-white overflow-x-hidden">
@@ -93,6 +98,8 @@ export default function App() {
         currentTab={currentTab === 'report-print' ? 'data-guru' : currentTab}
         onSelectTab={(tab) => {
           if (!isAdmin && (tab === 'data-guru' || tab === 'db-manager')) {
+            setCurrentTab('beranda');
+          } else if (isTendikOrOB && (tab === 'perangkat' || tab === 'jurnal')) {
             setCurrentTab('beranda');
           } else {
             setCurrentTab(tab);
@@ -139,6 +146,8 @@ export default function App() {
               db={db}
               onNavigate={(tab) => {
                 if (!isAdmin && (tab === 'data-guru' || tab === 'db-manager')) {
+                  setCurrentTab('beranda');
+                } else if (isTendikOrOB && (tab === 'perangkat' || tab === 'jurnal')) {
                   setCurrentTab('beranda');
                 } else {
                   setCurrentTab(tab);

@@ -39,13 +39,6 @@ class FlexibleDatabaseService {
             parsed.users = JSON.parse(JSON.stringify(initialDatabase.users));
             needsResave = true;
           } else {
-            // Ensure administrator exists
-            const hasAdmin = validUsers.some(
-              (u: User) => u.nip === 'admin' || u.role?.toLowerCase() === 'administrator'
-            );
-            if (!hasAdmin) {
-              validUsers.unshift(initialDatabase.users[0]);
-            }
             parsed.users = validUsers;
           }
 
@@ -217,31 +210,33 @@ class FlexibleDatabaseService {
     const cleanNip = nip.trim();
     const cleanPass = pass.trim();
 
-    // Check admin
-    if (cleanNip.toLowerCase() === 'admin' && cleanPass === 'admin123') {
-      const admin = this.db.users.find((u) => u.role === 'Administrator') || {
-        id: 'ADM01',
-        nip: 'admin',
-        nama: 'Administrator Sekolah',
-        role: 'Administrator'
-      };
-      return { success: true, user: admin, message: 'Login berhasil sebagai Administrator' };
+    if (!cleanNip || !cleanPass) {
+      return { success: false, message: 'NIK / NIP dan Password wajib diisi.' };
     }
 
-    const user = this.db.users.find(
-      (u) => u.nip.trim() === cleanNip && (u.password ? u.password === cleanPass : cleanPass === 'guru123')
-    );
+    // Hanya mencari user yang benar-benar ada di database users
+    // Tidak ada akun admin default, tidak ada password bypass hardcoded
+    const user = this.db.users.find((u) => {
+      if (!u || !u.nip) return false;
+      const target = cleanNip.toLowerCase();
+      const matchNip =
+        u.nip.trim().toLowerCase() === target ||
+        (u.nip_aliases && u.nip_aliases.some((a) => a.toLowerCase().trim() === target));
+      if (!matchNip) return false;
+      // Wajib cocok persis dengan password di database user
+      return String(u.password || '').trim() === cleanPass;
+    });
 
     if (user) {
       return { success: true, user, message: `Selamat datang, ${user.nama}` };
     }
 
-    return { success: false, message: 'NIK atau Password tidak cocok. Silakan coba lagi.' };
+    return { success: false, message: 'NIK / NIP atau Password salah atau tidak cocok dengan database user.' };
   }
 
   public getTeachers(): User[] {
     return this.db.users
-      .filter((u) => !u.role || (u.role.toLowerCase() !== 'administrator' && u.nip !== 'admin'))
+      .filter((u) => !u.role || (u.role.toLowerCase() !== 'administrator' && u.nip.toLowerCase() !== 'admin'))
       .sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' }));
   }
 
@@ -254,17 +249,11 @@ class FlexibleDatabaseService {
     const valid = users.filter(
       (u) => u && u.nip && u.nip.trim() !== '' && u.nama && u.nama.trim() !== '' && u.nama !== 'Guru'
     );
-    if (valid.length >= 3) {
-      // Ensure admin exists
-      const hasAdmin = valid.some((u) => u.role?.toLowerCase().includes('admin') || u.nip === 'admin');
-      if (!hasAdmin) {
-        const admin = this.db.users.find((u) => u.nip === 'admin') || initialDatabase.users[0];
-        valid.unshift(admin);
-      }
+    if (valid.length >= 2) {
       // Sort teachers alphabetically (preserving administrator at the top)
       valid.sort((a, b) => {
-        if (a.role?.toLowerCase() === 'administrator' || a.nip === 'admin') return -1;
-        if (b.role?.toLowerCase() === 'administrator' || b.nip === 'admin') return 1;
+        if (a.role?.toLowerCase() === 'administrator') return -1;
+        if (b.role?.toLowerCase() === 'administrator') return 1;
         return (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' });
       });
       this.db.users = valid;
@@ -282,8 +271,8 @@ class FlexibleDatabaseService {
     this.db.users.push(newTeacher);
     // Keep teachers sorted
     this.db.users.sort((a, b) => {
-      if (a.role?.toLowerCase() === 'administrator' || a.nip === 'admin') return -1;
-      if (b.role?.toLowerCase() === 'administrator' || b.nip === 'admin') return 1;
+      if (a.role?.toLowerCase() === 'administrator') return -1;
+      if (b.role?.toLowerCase() === 'administrator') return 1;
       return (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' });
     });
     this.saveToStorage();
@@ -293,8 +282,8 @@ class FlexibleDatabaseService {
   public updateTeacher(id: string, updates: Partial<User>) {
     this.db.users = this.db.users.map((u) => (u.id === id || u.nip === id ? { ...u, ...updates } : u));
     this.db.users.sort((a, b) => {
-      if (a.role?.toLowerCase() === 'administrator' || a.nip === 'admin') return -1;
-      if (b.role?.toLowerCase() === 'administrator' || b.nip === 'admin') return 1;
+      if (a.role?.toLowerCase() === 'administrator') return -1;
+      if (b.role?.toLowerCase() === 'administrator') return 1;
       return (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' });
     });
     this.saveToStorage();

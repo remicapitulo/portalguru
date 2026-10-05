@@ -643,6 +643,48 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
                 </div>
               </div>
 
+              {/* Rincian 8 Indikator Adab & Etika */}
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-indigo-900 border-b border-indigo-200/60 pb-1.5">
+                  <span>Rincian 8 Indikator Adab &amp; Etika Sejawat ({selectedDetail.peerReviewCount} Rekan Penilai):</span>
+                  <span className="font-mono font-black text-indigo-800">Rata-rata: {selectedDetail.adab.rataRata || '-'}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4a. Komunikasi Pimpinan</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.komunikasi_pimpinan || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4b. Komunikasi Siswa</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.komunikasi_siswa || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4c. Komunikasi Orang Tua</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.komunikasi_ortu || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4d. Komunikasi Rekan Sejawat</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.komunikasi_sejawat || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4e. Ketentuan Seragam</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.seragam || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4f. Busana Sesuai Adab</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.adab_pakaian || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4g. Ketaatan Tugas</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.ketaatan_tugas || '-'}</strong>
+                  </div>
+                  <div className="flex justify-between bg-white p-2 rounded-xl border border-indigo-100">
+                    <span className="text-slate-600">4h. Dandanan &amp; Kerapian</span>
+                    <strong className="font-mono text-indigo-900">{selectedDetail.adab.dandanan || '-'}</strong>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   onClick={() => {

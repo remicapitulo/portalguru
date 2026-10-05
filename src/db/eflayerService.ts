@@ -514,6 +514,29 @@ export class EflyerService {
 
     return summaries;
   }
+
+  // Get all cached reports synchronously
+  public getCachedReports(): EflyerReport[] {
+    const local = this.getLocalReports();
+    let cachedSheet: EflyerReport[] = [];
+    try {
+      const saved = localStorage.getItem(CACHE_STORAGE_KEY);
+      if (saved) {
+        cachedSheet = JSON.parse(saved);
+      }
+    } catch (e) {}
+    return [...local, ...cachedSheet];
+  }
+
+  // Get teacher's average points for a given year (defaults to current year)
+  public getTeacherAvgPoin(teacher: User | null | undefined, year?: number): number {
+    if (!teacher) return 0;
+    const targetYear = year || new Date().getFullYear();
+    const reports = this.getCachedReports();
+    const summaries = this.calculateTeacherMonthlySummary(reports, teacher, targetYear);
+    const totalPoin = summaries.reduce((acc, m) => acc + m.poin, 0);
+    return Math.round(totalPoin / 12);
+  }
 }
 
 export const eflyerService = EflyerService.getInstance();

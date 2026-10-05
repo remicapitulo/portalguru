@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, CheckCircle2, AlertCircle, Save, Lock, ShieldCheck } from 'lucide-react';
 import { User, SchoolConfig, SemesterType } from '../../types';
 import { penilaianService, AbsensiRecord } from '../../db/penilaianService';
+import { eflyerService } from '../../db/eflayerService';
 
 interface AbsensiTabProps {
   currentUser: User | null;
@@ -38,15 +39,23 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
 
   const selectedTeacher = evaluatedTeachers.find((t) => t.nip === selectedNip) || null;
 
+  // Tarik update data spreadsheet Eflyer saat komponen dibuka
+  useEffect(() => {
+    eflyerService.fetchSpreadsheetReports().catch(() => {});
+  }, []);
+
   const currentRecord = selectedNip
     ? penilaianService.getAbsensi(selectedNip, academicYear, semester)
     : undefined;
+
+  // Nilai otomatis Rata Poin dari Update Eflayer (Terkunci & Tidak bisa diedit manual)
+  const autoEflyerPoin = selectedTeacher ? eflyerService.getTeacherAvgPoin(selectedTeacher) : 0;
 
   const [kehadiran, setKehadiran] = useState<number>(currentRecord?.kehadiran || 0);
   const [keterlambatan, setKeterlambatan] = useState<number>(currentRecord?.keterlambatan || 0);
   const [kepulangan, setKepulangan] = useState<number>(currentRecord?.kepulangan || 0);
   const [doaBersama, setDoaBersama] = useState<number>(currentRecord?.doa_bersama || 0);
-  const [shareEflyer, setShareEflyer] = useState<number>(currentRecord?.share_eflayer || 0);
+  const [shareEflyer, setShareEflyer] = useState<number>(autoEflyerPoin);
   const [catatan, setCatatan] = useState<string>(currentRecord?.catatan || '');
 
   const [saving, setSaving] = useState(false);
@@ -55,11 +64,14 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
   const handleSelectTeacher = (nip: string) => {
     setSelectedNip(nip);
     const rec = penilaianService.getAbsensi(nip, academicYear, semester);
+    const teacherObj = evaluatedTeachers.find((t) => t.nip === nip) || null;
+    const autoPoin = teacherObj ? eflyerService.getTeacherAvgPoin(teacherObj) : 0;
     setKehadiran(rec?.kehadiran || 0);
     setKeterlambatan(rec?.keterlambatan || 0);
     setKepulangan(rec?.kepulangan || 0);
     setDoaBersama(rec?.doa_bersama || 0);
-    setShareEflyer(rec?.share_eflayer || 0);
+    // Terkunci otomatis dari Rata Poin di Update Eflayer
+    setShareEflyer(autoPoin);
     setCatatan(rec?.catatan || '');
     setFeedback(null);
   };
@@ -87,7 +99,7 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
         keterlambatan: Number(keterlambatan) || 0,
         kepulangan: Number(kepulangan) || 0,
         doa_bersama: Number(doaBersama) || 0,
-        share_eflayer: Number(shareEflyer) || 0,
+        share_eflayer: autoEflyerPoin, // Selalu otomatis mengambil dari Rata Poin di Update Eflayer
         catatan: catatan.trim(),
         updated_by: currentUser?.nama || 'Admin',
       };
@@ -345,21 +357,37 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
               </div>
 
               {/* 2e. Share Eflyer */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-                  <span>2e. Share Eflyer</span>
-                  <span className="text-blue-700">{shareEflyer}</span>
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 flex-wrap gap-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>2e. Share Eflyer</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-blue-600" />
+                      Eflayer: {autoEflyerPoin} Poin
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-slate-600" />
+                      Terkunci Otomatis
+                    </span>
+                  </div>
+                  <span className="text-blue-700 font-black">{autoEflyerPoin} / 100</span>
                 </div>
                 <p className="text-[10px] text-slate-500">Konsistensi menyebarkan info/flyer sekolah.</p>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={shareEflyer || ''}
-                  onChange={(e) => setShareEflyer(Math.min(100, Math.max(0, Number(e.target.value))))}
-                  placeholder="Skor 0 - 100"
-                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:border-blue-600 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    readOnly
+                    disabled
+                    value={autoEflyerPoin}
+                    className="w-full px-3 py-1.5 pr-8 rounded-xl border border-slate-200 bg-slate-100/90 text-xs font-bold text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                    title="Nilai 2e Share Eflyer terkunci karena otomatis dihitung dari Rata Poin di Update Eflayer."
+                  />
+                  <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <div className="flex items-center justify-between text-[10.5px] text-slate-500 pt-0.5">
+                  <span>Sumber: <strong>Modul Update Eflayer</strong></span>
+                  <span className="font-bold text-blue-700">Rata Poin: {autoEflyerPoin} (Otomatis)</span>
+                </div>
               </div>
 
               {/* Catatan */}
@@ -434,7 +462,11 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {evaluatedTeachers.map((t, idx) => {
                     const rec = allAbsensi.find((a) => a.target_nip === t.nip);
-                    const scores = rec ? [rec.kehadiran, rec.keterlambatan, rec.kepulangan, rec.doa_bersama, rec.share_eflayer] : [];
+                    const autoPoin = eflyerService.getTeacherAvgPoin(t);
+                    const effectiveEflyer = (rec && rec.share_eflayer > 0) ? rec.share_eflayer : autoPoin;
+                    const scores = rec
+                      ? [rec.kehadiran, rec.keterlambatan, rec.kepulangan, rec.doa_bersama, effectiveEflyer]
+                      : [0, 0, 0, 0, effectiveEflyer];
                     const avg = scores.some((v) => v > 0)
                       ? Math.round((scores.reduce((a, b) => a + b, 0) / 5) * 10) / 10
                       : 0;
@@ -453,7 +485,16 @@ export const AbsensiTab: React.FC<AbsensiTabProps> = ({
                         <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-800">{rec?.keterlambatan ?? '-'}</td>
                         <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-800">{rec?.kepulangan ?? '-'}</td>
                         <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-800">{rec?.doa_bersama ?? '-'}</td>
-                        <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-800">{rec?.share_eflayer ?? '-'}</td>
+                        <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-800">
+                          {rec && rec.share_eflayer > 0 ? (
+                            <span>{rec.share_eflayer}</span>
+                          ) : (
+                            <span className="text-blue-700 font-bold inline-flex items-center gap-0.5" title={`Otomatis dari Rata Poin Update Eflayer: ${autoPoin}`}>
+                              {effectiveEflyer > 0 ? effectiveEflyer : 0}
+                              <span className="text-[9px] text-blue-500 font-sans font-normal">(auto)</span>
+                            </span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-2 text-center font-mono font-black text-blue-700 bg-blue-50/30">
                           {avg > 0 ? avg : '-'}
                         </td>

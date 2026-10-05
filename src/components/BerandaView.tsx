@@ -39,6 +39,9 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
 }) => {
   const [eventFilterMode, setEventFilterMode] = useState<'h30' | 'all'>('h30');
 
+  const normalizedRole = (currentUser?.role || '').toLowerCase().trim();
+  const isTendikOrOB = normalizedRole === 'tendik' || normalizedRole === 'ob';
+
   // Filter out administrator and obtain real teachers
   const teachers = useMemo(() => {
     return (db.users || [])
@@ -193,13 +196,23 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-1">
-              <button
-                onClick={() => onNavigate('perangkat')}
-                className="px-5 py-2.5 rounded-xl bg-white text-blue-950 hover:bg-sky-50 font-bold text-xs lg:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-[44px]"
-              >
-                <FileCheck2 className="w-4 h-4 text-blue-700 shrink-0" />
-                <span>Kelola Perangkat Pembelajaran</span>
-              </button>
+              {isTendikOrOB ? (
+                <button
+                  onClick={() => onNavigate('penilaian')}
+                  className="px-5 py-2.5 rounded-xl bg-white text-purple-950 hover:bg-purple-50 font-bold text-xs lg:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-[44px]"
+                >
+                  <Award className="w-4 h-4 text-purple-700 shrink-0" />
+                  <span>Lihat Penilaian Kinerja</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => onNavigate('perangkat')}
+                  className="px-5 py-2.5 rounded-xl bg-white text-blue-950 hover:bg-sky-50 font-bold text-xs lg:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 min-h-[44px]"
+                >
+                  <FileCheck2 className="w-4 h-4 text-blue-700 shrink-0" />
+                  <span>Kelola Perangkat Pembelajaran</span>
+                </button>
+              )}
 
               <button
                 onClick={() => onNavigate('kaldik')}
@@ -220,7 +233,7 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-sky-300 block">
-                    Status Pendidik
+                    {isTendikOrOB ? 'Status Tenaga Kependidikan' : 'Status Pendidik'}
                   </span>
                   <h3 className="text-xs font-bold text-white truncate" title={currentUser.nama}>
                     {currentUser.nama}
@@ -232,7 +245,7 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
               </div>
 
               {/* Progress Summary if teacher progress exists */}
-              {currentUserProgress && (
+              {!isTendikOrOB && currentUserProgress && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-300 text-[11px]">Kelengkapan Berkas</span>
@@ -253,6 +266,19 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
                 </div>
               )}
 
+              {/* Tendik / OB Status & Menu Notice */}
+              {isTendikOrOB && (
+                <div className="space-y-1.5 pt-0.5 text-slate-300 text-xs">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-300">Hak Akses Portal:</span>
+                    <span className="font-bold text-emerald-400">Aktif (6 Menu)</span>
+                  </div>
+                  <p className="text-[10.5px] text-slate-300/80 leading-relaxed">
+                    Beranda, Kalender Pendidikan, Suara Guru, Update Eflayer, Ketidakhadiran, &amp; Penilaian Kinerja.
+                  </p>
+                </div>
+              )}
+
               <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-300">
                 <span className="flex items-center gap-1.5 font-medium text-emerald-300">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -269,9 +295,9 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-4">
         {/* 1. Total Guru */}
         <div
-          onClick={() => onNavigate(isAdmin ? 'data-guru' : 'perangkat')}
+          onClick={() => onNavigate(isAdmin ? 'data-guru' : (isTendikOrOB ? 'penilaian' : 'perangkat'))}
           className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-blue-300 hover:shadow-md transition cursor-pointer flex items-center gap-2.5 sm:gap-4 group min-w-0"
-          title={isAdmin ? "Klik untuk membuka daftar lengkap Data Guru" : "Kelola Perangkat Pembelajaran"}
+          title={isAdmin ? "Klik untuk membuka daftar lengkap Data Guru" : (isTendikOrOB ? "Buka Penilaian Kinerja" : "Kelola Perangkat Pembelajaran")}
         >
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-50 group-hover:bg-blue-100 text-blue-600 flex items-center justify-center font-bold transition shrink-0">
             <Users className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -291,9 +317,9 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
 
         {/* 2. Guru Lengkap (100% 36 slot) */}
         <div
-          onClick={() => onNavigate(isAdmin ? 'data-guru' : 'perangkat')}
+          onClick={() => onNavigate(isAdmin ? 'data-guru' : (isTendikOrOB ? 'penilaian' : 'perangkat'))}
           className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-emerald-300 hover:shadow-md transition cursor-pointer flex items-center gap-2.5 sm:gap-4 group min-w-0"
-          title={isAdmin ? "Klik untuk melihat rekapitulasi kelengkapan berkas guru" : "Kelola Perangkat Pembelajaran"}
+          title={isAdmin ? "Klik untuk melihat rekapitulasi kelengkapan berkas guru" : (isTendikOrOB ? "Buka Penilaian Kinerja" : "Kelola Perangkat Pembelajaran")}
         >
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 group-hover:bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold transition shrink-0">
             <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -313,9 +339,9 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
 
         {/* 3. Rata-rata Kelengkapan */}
         <div
-          onClick={() => onNavigate('perangkat')}
+          onClick={() => onNavigate(isTendikOrOB ? 'penilaian' : 'perangkat')}
           className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:border-purple-300 hover:shadow-md transition cursor-pointer flex items-center gap-2.5 sm:gap-4 group min-w-0"
-          title="Klik untuk mengelola Perangkat Pembelajaran"
+          title={isTendikOrOB ? "Buka Penilaian Kinerja" : "Klik untuk mengelola Perangkat Pembelajaran"}
         >
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-purple-50 group-hover:bg-purple-100 text-purple-600 flex items-center justify-center font-bold transition shrink-0">
             <Award className="w-5 h-5 sm:w-6 sm:h-6" />

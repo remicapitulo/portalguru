@@ -28,20 +28,21 @@ export const initialConfig: SchoolConfig = {
 // Data pengguna riil sekolah sesuai sheet "user" & "usulan_guru"
 export const initialUsers: User[] = [
   {
-    id: 'USR-01',
+    id: 'USR-admin',
     nip: 'admin',
     nama: 'Administrator Sekolah',
-    password: 'admin',
+    password: 'admin321',
     role: 'Administrator',
-    mapel: 'Manajemen',
+    mapel: 'admin',
     email: 'admin@smpitpondokduta.sch.id',
-    avatar: 'A'
+    avatar: 'A',
+    nip_aliases: ['admin', 'T-admin']
   },
   {
-    id: 'USR-02',
+    id: 'USR-03.13.01.13',
     nip: '03.13.01.13',
     nama: 'Abu Haripin, M.Pd',
-    password: 'guru',
+    password: 'guru123',
     role: 'Administrator',
     mapel: 'Bahasa Inggris',
     email: 'abuharipin23@admin.smp.belajar.id',
@@ -49,32 +50,61 @@ export const initialUsers: User[] = [
     nip_aliases: ['03.13.01.13', 'T-03.13.01.13', 'Abu Haripin', 'Abu Haripin, M.Pd']
   },
   {
-    id: 'USR-03',
-    nip: '03.13.06.15',
-    nama: 'M. Miftahur Rahman, S.I',
-    password: 'guru',
+    id: 'USR-03.23.09.61',
+    nip: '03.23.09.61',
+    nama: 'Anggita Aprilia Sari, S.Sos',
+    password: 'guru123',
     role: 'Guru',
-    mapel: 'Al Qur\'an',
-    email: 'miftahur@smpitpondokduta.sch.id',
-    avatar: 'M',
-    nip_aliases: ['02.18.07.135', '03.13.06.15', 'T-03.13.06.15', 'Novi Mulafatturrahman', 'Novi Mulafatturrahman, S.Pd.', 'M. Miftahur Rahman']
+    mapel: 'Bimbingan dan Konseling',
+    avatar: 'A',
+    nip_aliases: ['03.23.09.61', 'T-03.23.09.61', 'Anggita Aprilia Sari']
   },
   {
-    id: 'USR-04',
+    id: 'USR-03.25.09.65',
+    nip: '03.25.09.65',
+    nama: 'Ayu Yulia Ambarwiningsih, S.Pd',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'Bahasa Sunda',
+    avatar: 'A',
+    nip_aliases: ['03.25.09.65', 'T-03.25.09.65', 'Ayu Yulia']
+  },
+  {
+    id: 'USR-03.25.07.63',
     nip: '03.25.07.63',
     nama: 'Chintya Handayani, M.Pd',
-    password: 'guru',
+    password: 'guru123',
     role: 'Guru',
     mapel: 'IPS',
     email: 'chintya@smpitpondokduta.sch.id',
     avatar: 'C',
-    nip_aliases: ['03.25.07.63', 'T-03.25.07.63', 'Chintya Handaya', 'Chintya Handaya, M.Pd', 'Chintya Handayani']
+    nip_aliases: ['03.25.07.63', 'T-03.25.07.63', 'Chintya Handayani']
   },
   {
-    id: 'USR-05',
+    id: 'USR-03.26.06.67',
+    nip: '03.26.06.67',
+    nama: 'Devia Ayuningtias, S.Pd',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'IPA',
+    avatar: 'D',
+    nip_aliases: ['03.26.06.67', 'T-03.26.06.67', 'Devia Ayuningtias']
+  },
+  {
+    id: 'USR-03.23.09.60',
+    nip: '03.23.09.60',
+    nama: 'Dina Witri Setyaningsih, S.Pd',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'SBDP',
+    avatar: 'D',
+    nip_aliases: ['03.23.09.60', 'T-03.23.09.60', 'Dina Witri']
+  },
+  {
+    id: 'USR-03.26.06.66',
     nip: '03.26.06.66',
     nama: 'Firhan Baihaqi, S.Pd',
-    password: 'guru',
+    password: 'guru123',
     role: 'Guru',
     mapel: 'PJOK',
     email: 'firhan@smpitpondokduta.sch.id',
@@ -82,48 +112,138 @@ export const initialUsers: User[] = [
     nip_aliases: ['03.26.06.66', 'T-03.26.06.66', 'Firhan Baihaqi']
   },
   {
-    id: 'USR-06',
-    nip: '02.13.08.92',
-    nama: 'Syifa Fauziah, S.Pd.I',
-    password: 'guru',
+    id: 'USR-03.11.06.04',
+    nip: '03.11.06.04',
+    nama: 'Iwan, S.Pd.I',
+    password: 'guru123',
     role: 'Guru',
-    mapel: 'PAI & Budi Pekerti',
-    email: 'syifa@smpitpondokduta.sch.id',
-    avatar: 'S',
-    nip_aliases: ['02.19.08.101', '02.13.08.92', 'T-02.13.08.92', 'Syifa Fauziah']
+    mapel: 'PAI',
+    avatar: 'I',
+    nip_aliases: ['03.11.06.04', 'T-03.11.06.04', 'Iwan']
   },
   {
-    id: 'USR-07',
-    nip: '02.20.09.112',
-    nama: 'Nilam Cahya, S.Pd',
-    password: 'guru',
+    id: 'USR-02.18.07.135',
+    nip: '02.18.07.135',
+    nama: 'M. Miftahur Rahman, S.Pd.',
+    password: 'guru123',
     role: 'Guru',
-    mapel: 'Matematika',
+    mapel: 'Al Qur\'an',
+    email: 'miftahur@smpitpondokduta.sch.id',
+    avatar: 'M',
+    nip_aliases: ['02.18.07.135', '03.13.06.15', 'T-02.18.07.135', 'M. Miftahur Rahman']
+  },
+  {
+    id: 'USR-03.18.10.49',
+    nip: '03.18.10.49',
+    nama: 'Nilam Cahya, S.Pd',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'Bahasa Inggris',
     email: 'nilam@smpitpondokduta.sch.id',
     avatar: 'N',
-    nip_aliases: ['02.20.09.112', 'T-02.20.09.112', 'Nilam Cahya']
+    nip_aliases: ['03.18.10.49', 'T-03.18.10.49', 'Nilam Cahya']
   },
   {
-    id: 'USR-08',
-    nip: '01.13.07.24',
-    nama: 'Nurhasanah, S.Pd',
-    password: 'guru',
+    id: 'USR-03.13.06.15',
+    nip: '03.13.06.15',
+    nama: 'Novi Mulafaturrochmah, S.Pd.',
+    password: 'guru123',
     role: 'Guru',
     mapel: 'Bahasa Indonesia',
-    email: 'nurhasanah@smpitpondokduta.sch.id',
     avatar: 'N',
-    nip_aliases: ['03.21.05.77', '01.13.07.24', 'T-01.13.07.24', 'Nurhasanah']
+    nip_aliases: ['03.13.06.15', 'T-03.13.06.15', 'Novi Mulafaturrochmah']
   },
   {
-    id: 'USR-09',
-    nip: '03.23.09.61',
-    nama: 'Anggita Aprilia Sari, S.Sos',
-    password: 'guru',
+    id: 'USR-01.13.07.24',
+    nip: '01.13.07.24',
+    nama: 'Nurhasanah, S.Pd',
+    password: 'guru123',
     role: 'Guru',
-    mapel: 'BK & Komite',
-    email: 'anggita@smpitpondokduta.sch.id',
-    avatar: 'A',
-    nip_aliases: ['03.24.08.89', '03.23.09.61', 'T-03.23.09.61', 'Anggita Aprilia Sari', 'Anggita Aprillia Sari', 'Anggita Aprillia Sari, S.Sos']
+    mapel: 'Pendidikan Pancasila',
+    email: 'nurhasanah@smpitpondokduta.sch.id',
+    avatar: 'N',
+    nip_aliases: ['01.13.07.24', 'T-01.13.07.24', 'Nurhasanah']
+  },
+  {
+    id: 'USR-03.25.07.64',
+    nip: '03.25.07.64',
+    nama: 'Risma Apriliyani, S.Pd',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'Matematika',
+    avatar: 'R',
+    nip_aliases: ['03.25.07.64', 'T-03.25.07.64', 'Risma Apriliyani']
+  },
+  {
+    id: 'USR-03.25.06.62',
+    nip: '03.25.06.62',
+    nama: 'Syarif Alzulmi, S.Pd',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'Bahasa Arab',
+    avatar: 'S',
+    nip_aliases: ['03.25.06.62', 'T-03.25.06.62', 'Syarif Alzulmi']
+  },
+  {
+    id: 'USR-02.13.08.92',
+    nip: '02.13.08.92',
+    nama: 'Syifa Fauziah, S.Pd.I',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'Al Qur\'an',
+    email: 'syifa@smpitpondokduta.sch.id',
+    avatar: 'S',
+    nip_aliases: ['02.13.08.92', 'T-02.13.08.92', 'Syifa Fauziah']
+  },
+  {
+    id: 'USR-03.16.03.26',
+    nip: '03.16.03.26',
+    nama: 'Wahyu Ramadhan, S.Kom.',
+    password: 'guru123',
+    role: 'Guru',
+    mapel: 'Informatika',
+    avatar: 'W',
+    nip_aliases: ['03.16.03.26', 'T-03.16.03.26', 'Wahyu Ramadhan']
+  },
+  {
+    id: 'USR-02.18.10.141',
+    nip: '02.18.10.141',
+    nama: 'Putri Pratiwi, S.Pd',
+    password: '12345',
+    role: 'Tendik',
+    mapel: 'Tata Usaha',
+    avatar: 'P',
+    nip_aliases: ['02.18.10.141', 'T-02.18.10.141', 'Putri Pratiwi']
+  },
+  {
+    id: 'USR-02.15.06.104',
+    nip: '02.15.06.104',
+    nama: 'Rahmaniar, S.Pd',
+    password: '12345',
+    role: 'Tendik',
+    mapel: 'Bendahara',
+    avatar: 'R',
+    nip_aliases: ['02.15.06.104', 'T-02.15.06.104', 'Rahmaniar']
+  },
+  {
+    id: 'USR-03.16.09.34',
+    nip: '03.16.09.34',
+    nama: 'Rullyansyah',
+    password: '12345',
+    role: 'OB',
+    mapel: 'OB 1',
+    avatar: 'R',
+    nip_aliases: ['03.16.09.34', 'T-03.16.09.34', 'Rullyansyah']
+  },
+  {
+    id: 'USR-03.13.09.15',
+    nip: '03.13.09.15',
+    nama: 'Nasrullah',
+    password: '12345',
+    role: 'OB',
+    mapel: 'OB 2',
+    avatar: 'N',
+    nip_aliases: ['03.13.09.15', 'T-03.13.09.15', 'Nasrullah']
   }
 ];
 

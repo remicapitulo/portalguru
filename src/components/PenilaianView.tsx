@@ -61,7 +61,6 @@ export const PenilaianView: React.FC<PenilaianViewProps> = ({
         currentUser.role?.toLowerCase() === 'administrator' ||
         currentUser.role?.toLowerCase() === 'kepala_sekolah' ||
         currentUser.role?.toLowerCase().includes('kepala') ||
-        currentUser.nip?.toLowerCase() === 'admin' ||
         (config.headmaster_nip && currentUser.nip === config.headmaster_nip) ||
         (config.headmaster && currentUser.nama?.toLowerCase().includes(config.headmaster.toLowerCase().trim())))
   );

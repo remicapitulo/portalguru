@@ -60,8 +60,7 @@ export const PerangkatView: React.FC<PerangkatViewProps> = ({
   // If user is Admin, they can choose which teacher to inspect/manage. If Guru, locked to their own account.
   const isAdmin =
     currentUser?.role?.toLowerCase() === 'administrator' ||
-    currentUser?.role?.toLowerCase() === 'admin' ||
-    currentUser?.nip === 'admin';
+    currentUser?.role?.toLowerCase() === 'admin';
 
   // Search filter for teacher selector
   const [teacherSearch, setTeacherSearch] = useState('');

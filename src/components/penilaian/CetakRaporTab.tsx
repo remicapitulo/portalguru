@@ -156,7 +156,14 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
       ['3b', '  • Keaktifan Ta\'lim / Pengajian Rutin Yayasan', `${raporData.yayasan.talim || '-'}`, '', ''],
       ['3c', '  • Sosialisasi & Agenda Yayasan', `${raporData.yayasan.sosialisasi || '-'}`, '', ''],
       ['IV', `ADAB & ETIKA SEJAWAT (${raporData.peerReviewCount} Rekan Penilai)`, '', `${raporData.adab.rataRata || '-'}`, 'Baik'],
-      ['4', '  • Rata-rata 8 Indikator (Komunikasi, Seragam, Adab, Ketaatan)', `${raporData.adab.rataRata || '-'}`, '', ''],
+      ['4a', '  • Komunikasi Kepada Pimpinan', `${raporData.adab.komunikasi_pimpinan || '-'}`, '', ''],
+      ['4b', '  • Komunikasi Kepada Siswa', `${raporData.adab.komunikasi_siswa || '-'}`, '', ''],
+      ['4c', '  • Komunikasi Kepada Orang Tua Siswa', `${raporData.adab.komunikasi_ortu || '-'}`, '', ''],
+      ['4d', '  • Komunikasi Kepada Teman Sejawat', `${raporData.adab.komunikasi_sejawat || '-'}`, '', ''],
+      ['4e', '  • Berpakaian Sesuai Ketentuan Seragam', `${raporData.adab.seragam || '-'}`, '', ''],
+      ['4f', '  • Berpakaian Sesuai Adab Islami', `${raporData.adab.adab_pakaian || '-'}`, '', ''],
+      ['4g', '  • Ketaatan Menjalankan Tugas', `${raporData.adab.ketaatan_tugas || '-'}`, '', ''],
+      ['4h', '  • Kerapian Dandanan & Penampilan', `${raporData.adab.dandanan || '-'}`, '', ''],
       ['', 'TOTAL JUMLAH SKOR KINERJA', '', `${raporData.jumlah}`, ''],
       ['', 'NILAI AKHIR RAPOR DIKTENDIK', '', `${raporData.rata_rata}`, `Kategori: ${raporData.kategori}`],
     ];
@@ -492,11 +499,58 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4</td>
-                  <td className="py-1.5 px-3 pl-6 border border-slate-200">
-                    Rata-rata 8 Indikator (Komunikasi, Busana Islami, Seragam, Ketaatan Tugas, Dandanan)
-                  </td>
-                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.rataRata || '-'}</td>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4a</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Komunikasi Kepada Pimpinan</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.komunikasi_pimpinan || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4b</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Komunikasi Kepada Siswa</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.komunikasi_siswa || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4c</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Komunikasi Kepada Orang Tua Siswa</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.komunikasi_ortu || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4d</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Komunikasi Kepada Teman Sejawat</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.komunikasi_sejawat || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4e</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Berpakaian Sesuai Ketentuan Seragam</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.seragam || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4f</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Berpakaian Sesuai Adab Islami</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.adab_pakaian || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4g</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Ketaatan Menjalankan Tugas</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.ketaatan_tugas || '-'}</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                  <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
+                </tr>
+                <tr>
+                  <td className="py-1.5 px-3 text-center text-slate-400 border border-slate-200">4h</td>
+                  <td className="py-1.5 px-3 pl-6 border border-slate-200">Kerapian Dandanan &amp; Penampilan</td>
+                  <td className="py-1.5 px-3 text-center font-mono border border-slate-200">{raporData.adab.dandanan || '-'}</td>
                   <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
                   <td className="py-1.5 px-3 text-center border border-slate-200 text-slate-400">-</td>
                 </tr>

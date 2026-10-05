@@ -142,18 +142,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  const normalizedRole = (role || '').toLowerCase().trim();
   const isAdmin = Boolean(
-    role &&
-    (role.toLowerCase() === 'admin' ||
-     role.toLowerCase() === 'administrator' ||
-     role.toLowerCase().includes('admin'))
+    normalizedRole === 'admin' ||
+    normalizedRole === 'administrator' ||
+    normalizedRole.includes('admin')
   );
 
-  // Filter: Hide "Data Guru & Rekap" and "Database Spreadsheet" from Role: Guru
+  // Role: Tendik & OB hanya memiliki akses ke 6 menu:
+  // Beranda, Kalender Pendidikan, Suara Guru, Update Eflayer, Daftar Ketidakhadiran, Penilaian Kinerja
+  const isTendikOrOB = normalizedRole === 'tendik' || normalizedRole === 'ob';
+
   const visibleMenuItems = menuItems.filter((item) => {
+    // 1. Data Guru & Rekap serta Database Spreadsheet: Hanya untuk Administrator
     if (item.id === 'data-guru' || item.id === 'db-manager') {
       return isAdmin;
     }
+
+    // 2. Role Tendik dan OB: Dibatasi hanya pada 6 menu yang ditentukan
+    if (isTendikOrOB) {
+      return (
+        item.id === 'beranda' ||
+        item.id === 'kaldik' ||
+        item.id === 'usulan' ||
+        item.id === 'eflayer' ||
+        item.id === 'ketidakhadiran' ||
+        item.id === 'penilaian'
+      );
+    }
+
+    // 3. Role Guru / Default: Memiliki akses ke Beranda, Perangkat, Kaldik, Usulan, Jurnal, Eflayer, Ketidakhadiran, Penilaian
     return true;
   });
 

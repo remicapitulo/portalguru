@@ -1,6 +1,7 @@
 import { User, SemesterType, SchoolConfig, KetidakhadiranItem } from '../types';
 import { initialUsers, initialConfig } from './initialData';
 import { dbService } from './storage';
+import { eflyerService } from './eflayerService';
 
 export const PENILAIAN_SPREADSHEET_ID = '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU';
 export const DEFAULT_PENILAIAN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec';
@@ -1173,7 +1174,6 @@ class PenilaianService {
     const nip = (user.nip || '').trim();
     const role = (user.role || '').toLowerCase().trim();
 
-    if (nip === 'admin') return true;
     if (role === 'kepala_sekolah' || role === 'kepala sekolah' || role.includes('kepala')) return true;
 
     // Check config headmaster nip or nik
@@ -1796,23 +1796,38 @@ class PenilaianService {
     semester: SemesterType,
     index = 1
   ): RaporDiktendikItem {
-    const supervisi = this.getSupervisi(teacher.nip, tahun_ajaran, semester) || {
+    const rawSupervisi = this.getSupervisi(teacher.nip, tahun_ajaran, semester);
+    const teacherProgress = dbService.calculateTeacherProgress(teacher.nip);
+    const autoAdminScore = teacherProgress ? teacherProgress.percentage : 0;
+    const effectiveAdminScore = (rawSupervisi && rawSupervisi.administrasi > 0)
+      ? rawSupervisi.administrasi
+      : autoAdminScore;
+
+    const supervisi = {
       target_nip: teacher.nip,
       tahun_ajaran,
       semester,
-      kbm: 0,
-      administrasi: 0,
+      kbm: rawSupervisi?.kbm || 0,
+      administrasi: effectiveAdminScore,
+      catatan: rawSupervisi?.catatan || '',
     };
 
-    const absensi = this.getAbsensi(teacher.nip, tahun_ajaran, semester) || {
+    const rawAbsensi = this.getAbsensi(teacher.nip, tahun_ajaran, semester);
+    const autoEflyerPoin = eflyerService.getTeacherAvgPoin(teacher);
+    const effectiveShareEflyer = (rawAbsensi && rawAbsensi.share_eflayer > 0)
+      ? rawAbsensi.share_eflayer
+      : autoEflyerPoin;
+
+    const absensi = {
       target_nip: teacher.nip,
       tahun_ajaran,
       semester,
-      kehadiran: 0,
-      keterlambatan: 0,
-      kepulangan: 0,
-      doa_bersama: 0,
-      share_eflayer: 0,
+      kehadiran: rawAbsensi?.kehadiran || 0,
+      keterlambatan: rawAbsensi?.keterlambatan || 0,
+      kepulangan: rawAbsensi?.kepulangan || 0,
+      doa_bersama: rawAbsensi?.doa_bersama || 0,
+      share_eflayer: effectiveShareEflyer,
+      catatan: rawAbsensi?.catatan || '',
     };
 
     const yayasan = this.getYayasan(teacher.nip, tahun_ajaran, semester) || {

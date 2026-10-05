@@ -33,7 +33,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   db,
   onOpenReportPrint,
 }) => {
-  const isAdmin = currentUser?.role?.toLowerCase() === 'administrator' || currentUser?.role?.toLowerCase() === 'admin' || currentUser?.nip === 'admin';
+  const isAdmin = currentUser?.role?.toLowerCase() === 'administrator' || currentUser?.role?.toLowerCase() === 'admin';
   const [searchTerm, setSearchTerm] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTeacherId, setEditingTeacherId] = useState<string | null>(null);
@@ -44,7 +44,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
   const [mapel, setMapel] = useState('');
   const [role, setRole] = useState('Guru');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('guru123');
+  const [password, setPassword] = useState('');
 
   // Confirmation modal states (replaces blocked window.confirm)
   const [deleteConfirmTeacher, setDeleteConfirmTeacher] = useState<User | null>(null);
@@ -84,7 +84,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
     setMapel('');
     setRole('Guru');
     setEmail('');
-    setPassword('guru123');
+    setPassword('');
     setModalOpen(true);
   };
 
@@ -95,7 +95,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
     setMapel(teacher.mapel || '');
     setRole(teacher.role || 'Guru');
     setEmail(teacher.email || '');
-    setPassword(teacher.password || 'guru123');
+    setPassword(teacher.password || '');
     setModalOpen(true);
   };
 
@@ -109,7 +109,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
       mapel: mapel.trim(),
       role: role.trim() || 'Guru',
       email: email.trim() || undefined,
-      password: password.trim() || 'guru123',
+      password: password.trim(),
     };
 
     if (editingTeacherId) {
@@ -556,6 +556,8 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:border-indigo-600 outline-none font-bold bg-white"
                   >
                     <option value="Guru">Guru</option>
+                    <option value="Tendik">Tendik (Tenaga Kependidikan)</option>
+                    <option value="OB">OB (Office Boy / Kebersihan)</option>
                     <option value="Administrator">Administrator</option>
                   </select>
                 </div>
@@ -568,7 +570,7 @@ export const DataGuruView: React.FC<DataGuruViewProps> = ({
                     type="text"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="guru123"
+                    placeholder="Masukkan Password"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:border-indigo-600 outline-none font-mono"
                     required
                   />

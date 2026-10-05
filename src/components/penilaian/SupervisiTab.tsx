@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ShieldCheck, CheckCircle2, AlertCircle, Save, User, Lock, Award, BookOpenCheck } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, AlertCircle, Save, User, Lock, Award, BookOpenCheck, RefreshCw } from 'lucide-react';
 import { User as UserType, SchoolConfig, SemesterType } from '../../types';
 import { penilaianService } from '../../db/penilaianService';
+import { dbService } from '../../db/storage';
 
 interface SupervisiTabProps {
   currentUser: UserType | null;
@@ -57,8 +58,12 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
     ? penilaianService.getSupervisi(selectedNip, academicYear, semester)
     : undefined;
 
+  // Persentase kelengkapan upload perangkat guru otomatis (100% -> 100, 80% -> 80)
+  const teacherProgress = selectedNip ? dbService.calculateTeacherProgress(selectedNip) : null;
+  const autoAdministrasiScore = teacherProgress ? teacherProgress.percentage : 0;
+
   const [kbm, setKbm] = useState<number>(currentRecord?.kbm || 0);
-  const [administrasi, setAdministrasi] = useState<number>(currentRecord?.administrasi || 0);
+  const [administrasi, setAdministrasi] = useState<number>(autoAdministrasiScore);
   const [catatan, setCatatan] = useState<string>(currentRecord?.catatan || '');
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -67,8 +72,11 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
     setSelectedNip(nip);
     setFeedback(null);
     const rec = penilaianService.getSupervisi(nip, academicYear, semester);
+    const prog = dbService.calculateTeacherProgress(nip);
+    const autoScore = prog ? prog.percentage : 0;
     setKbm(rec?.kbm || 0);
-    setAdministrasi(rec?.administrasi || 0);
+    // Terkunci otomatis dari persentase upload perangkat guru
+    setAdministrasi(autoScore);
     setCatatan(rec?.catatan || '');
   };
 
@@ -93,7 +101,7 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
           tahun_ajaran: academicYear,
           semester,
           kbm: Number(kbm) || 0,
-          administrasi: Number(administrasi) || 0,
+          administrasi: autoAdministrasiScore,
           catatan: catatan.trim(),
           updated_by: currentUser?.nama || 'Admin',
         },
@@ -119,8 +127,13 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
     ? penilaianService.getSupervisi(currentUser.nip, academicYear, semester)
     : undefined;
 
-  const myAvg = myRecord && (myRecord.kbm > 0 || myRecord.administrasi > 0)
-    ? Math.round(((myRecord.kbm + myRecord.administrasi) / 2) * 10) / 10
+  const myProgress = currentUser ? dbService.calculateTeacherProgress(currentUser.nip) : null;
+  const myEffectiveAdmin = (myRecord && myRecord.administrasi > 0)
+    ? myRecord.administrasi
+    : (myProgress ? myProgress.percentage : 0);
+
+  const myAvg = (myRecord && myRecord.kbm > 0) || myEffectiveAdmin > 0
+    ? Math.round((((myRecord?.kbm || 0) + myEffectiveAdmin) / 2) * 10) / 10
     : 0;
 
   return (
@@ -170,12 +183,28 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
             </div>
 
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs space-y-2">
-              <span className="text-xs font-bold text-slate-500 uppercase block">1b. Kelengkapan Administrasi</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase block">1b. Kelengkapan Administrasi</span>
+                {myProgress && (
+                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                    {myProgress.percentage}% Perangkat
+                  </span>
+                )}
+              </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-purple-700">{myRecord?.administrasi || '-'}</span>
+                <span className="text-3xl font-black text-purple-700">{myEffectiveAdmin > 0 ? myEffectiveAdmin : '-'}</span>
                 <span className="text-xs text-slate-400">/ 100</span>
               </div>
-              <p className="text-[11px] text-slate-500">Modul Ajar, CP, ATP, Prota, Promes, & Jurnal Mengajar.</p>
+              <p className="text-[11px] text-slate-500">
+                {myRecord && myRecord.administrasi > 0 ? (
+                  <span>Modul Ajar, CP, ATP, Prota, Promes, & Jurnal Mengajar.</span>
+                ) : (
+                  <span className="text-emerald-700 font-semibold">
+                    Otomatis dari kelengkapan upload perangkat: {myProgress?.filledSlots || 0} dari {myProgress?.totalSlots || 36} kategori ({myProgress?.percentage || 0}%).
+                  </span>
+                )}
+              </p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-900 to-indigo-950 text-white p-5 rounded-3xl shadow-xs space-y-2">
@@ -250,21 +279,38 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
 
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-800">
-                    1b. Administrasi Guru
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                    <span>1b. Administrasi Guru</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                      Perangkat: {autoAdministrasiScore}%
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 border border-slate-300 flex items-center gap-1">
+                      <Lock className="w-2.5 h-2.5 text-slate-600" />
+                      Terkunci Otomatis
+                    </span>
                   </label>
-                  <span className="text-xs font-black text-purple-700">{administrasi} / 100</span>
+                  <span className="text-xs font-black text-purple-700">{autoAdministrasiScore} / 100</span>
                 </div>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={administrasi || ''}
-                  onChange={(e) => setAdministrasi(Math.min(100, Math.max(0, Number(e.target.value))))}
-                  placeholder="Skor 0 - 100"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 focus:border-purple-600 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    readOnly
+                    disabled
+                    value={autoAdministrasiScore}
+                    className="w-full px-3 py-2 pr-9 rounded-xl border border-slate-200 bg-slate-100/90 text-xs font-bold text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                    title="Nilai administrasi terkunci karena otomatis dihitung dari kelengkapan upload perangkat guru."
+                  />
+                  <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+                <div className="flex items-center justify-between text-[11px] pt-0.5 text-slate-500">
+                  <span>
+                    Upload Perangkat: <strong className="text-slate-800 font-bold">{teacherProgress?.filledSlots || 0}</strong> dari {teacherProgress?.totalSlots || 36} kategori
+                  </span>
+                  <span className="font-bold text-emerald-700">
+                    {autoAdministrasiScore}% → Skor {autoAdministrasiScore} (Otomatis)
+                  </span>
+                </div>
               </div>
 
               <div>
@@ -336,8 +382,14 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {evaluatedTeachers.map((t, idx) => {
                     const rec = allSupervisi.find((s) => s.target_nip === t.nip);
-                    const avg = rec && (rec.kbm > 0 || rec.administrasi > 0)
-                      ? Math.round(((rec.kbm + rec.administrasi) / 2) * 10) / 10
+                    const tProg = dbService.calculateTeacherProgress(t.nip);
+                    const autoScore = tProg ? tProg.percentage : 0;
+                    const effectiveAdmin = (rec && rec.administrasi > 0)
+                      ? rec.administrasi
+                      : autoScore;
+                    const kbmVal = rec?.kbm || 0;
+                    const avg = (kbmVal > 0 || effectiveAdmin > 0)
+                      ? Math.round(((kbmVal + effectiveAdmin) / 2) * 10) / 10
                       : 0;
 
                     return (
@@ -354,7 +406,17 @@ export const SupervisiTab: React.FC<SupervisiTabProps> = ({
                           {rec?.kbm ?? '-'}
                         </td>
                         <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-800">
-                          {rec?.administrasi ?? '-'}
+                          {rec && rec.administrasi > 0 ? (
+                            <span>{rec.administrasi}</span>
+                          ) : (
+                            <span
+                              className="text-emerald-700 font-bold inline-flex items-center gap-0.5"
+                              title={`Otomatis dari Kelengkapan Upload Perangkat: ${tProg.percentage}% (${tProg.filledSlots}/${tProg.totalSlots} kategori)`}
+                            >
+                              {effectiveAdmin > 0 ? effectiveAdmin : 0}
+                              <span className="text-[9px] text-emerald-600 font-sans font-normal">(auto)</span>
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-2 text-center font-mono font-black text-purple-700 bg-purple-50/30">
                           {avg > 0 ? avg : '-'}

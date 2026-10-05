@@ -1300,15 +1300,16 @@ function processLogin(nip, password) {
   const cleanNip = String(nip || "").trim();
   const cleanPass = String(password || "").trim();
 
-  if (cleanNip.toLowerCase() === "admin" && cleanPass === "admin123") {
-    return { success: true, user: { nip: "admin", nama: "Administrator Sekolah", role: "Administrator", mapel: "Manajemen" } };
+  if (!cleanNip || !cleanPass) {
+    return { success: false, message: "NIK / NIP dan Password wajib diisi!" };
   }
 
-  const found = users.find(u => u.nip === cleanNip && (u.password === cleanPass || cleanPass === "guru123"));
+  // Hanya mencocokkan akun dan password yang terdaftar persis di sheet "user"
+  const found = users.find(u => String(u.nip || "").trim().toLowerCase() === cleanNip.toLowerCase() && String(u.password || "").trim() === cleanPass);
   if (found) {
     return { success: true, user: found };
   }
-  return { success: false, message: "NIK atau Password salah!" };
+  return { success: false, message: "NIK / NIP atau Password tidak cocok dengan database user!" };
 }
 
 function addUserToSheet(user) {
