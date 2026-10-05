@@ -78,10 +78,10 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
     config.drive_folder_perangkat_id || '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp'
   );
   const [penilaianSpreadsheetId, setPenilaianSpreadsheetId] = useState(
-    config.penilaian_spreadsheet_id || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY'
+    config.penilaian_spreadsheet_id || '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU'
   );
   const [penilaianAppsScriptUrl, setPenilaianAppsScriptUrl] = useState(
-    config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
+    config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec'
   );
   
   const [configSaved, setConfigSaved] = useState(false);
@@ -120,8 +120,8 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
     setLogoFolderId(config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ');
     setDriveFolderId(config.drive_folder_id || '1iW9MXmYQDE7hGZOM8z0JJpQ_QQGcenwS');
     setDriveFolderPerangkatId(config.drive_folder_perangkat_id || '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp');
-    setPenilaianSpreadsheetId(config.penilaian_spreadsheet_id || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY');
-    setPenilaianAppsScriptUrl(config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec');
+    setPenilaianSpreadsheetId(config.penilaian_spreadsheet_id || '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU');
+    setPenilaianAppsScriptUrl(config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec');
   }, [config]);
 
   // Helper to normalize Google Drive image links so they work universally in <img> and PDF
@@ -261,8 +261,8 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
       logo_folder_id: logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
       drive_folder_id: driveFolderId.trim(),
       drive_folder_perangkat_id: driveFolderPerangkatId.trim(),
-      penilaian_spreadsheet_id: penilaianSpreadsheetId.trim() || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY',
-      penilaian_apps_script_url: penilaianAppsScriptUrl.trim() || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
+      penilaian_spreadsheet_id: penilaianSpreadsheetId.trim() || '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU',
+      penilaian_apps_script_url: penilaianAppsScriptUrl.trim() || 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec'
     };
 
     // 1. Update local database immediately
@@ -1932,7 +1932,7 @@ function deleteUsulanFromSheet(rowIndex) {
                 <div className="flex items-center justify-between">
                   <span className="font-extrabold text-purple-900 block">Database Penilaian Kinerja &amp; Ketidakhadiran (Spreadsheet Terpisah)</span>
                   <a
-                    href="https://docs.google.com/spreadsheets/d/1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY/edit"
+                    href="https://docs.google.com/spreadsheets/d/1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU/edit"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline inline-flex items-center gap-1"
@@ -1942,7 +1942,7 @@ function deleteUsulanFromSheet(rowIndex) {
                   </a>
                 </div>
                 <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
-                  Spreadsheet ID: 1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY • Sheet: Penilaian_Antar_Rekan, Supervisi, Absensi_Disiplin, Kegiatan_Yayasan, Rapor_Diktendik, Ketidakhadiran.
+                  Spreadsheet ID: 1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU • Sheet: Penilaian_Antar_Rekan, Supervisi, Absensi_Disiplin, Kegiatan_Yayasan, Rapor_Diktendik, Ketidakhadiran.
                 </p>
                 <p className="text-[10px] text-purple-700 font-medium mt-0.5">
                   Dipisahkan dari database utama agar lalu lintas berkas perangkat pembelajaran tetap ringan dan performa pencatatan selalu prima.
@@ -2098,7 +2098,7 @@ function deleteUsulanFromSheet(rowIndex) {
                       ID Google Spreadsheet (Penilaian Antar Rekan)
                     </label>
                     <a
-                      href={`https://docs.google.com/spreadsheets/d/${penilaianSpreadsheetId || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY'}/edit`}
+                      href={`https://docs.google.com/spreadsheets/d/${penilaianSpreadsheetId || '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU'}/edit`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] text-purple-700 hover:underline flex items-center gap-1 font-semibold"
@@ -2111,7 +2111,7 @@ function deleteUsulanFromSheet(rowIndex) {
                     type="text"
                     value={penilaianSpreadsheetId}
                     onChange={(e) => setPenilaianSpreadsheetId(e.target.value)}
-                    placeholder="1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY"
+                    placeholder="1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU"
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-[11px] focus:border-purple-600 outline-none"
                   />
                 </div>

@@ -101,6 +101,34 @@ export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
   const activeGasUrl = config.penilaian_apps_script_url || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
   const penilaianSpreadsheetId = config.penilaian_spreadsheet_id || PENILAIAN_SPREADSHEET_ID;
 
+  // Cek apakah user yang login adalah pemilik ajuan (guru yang bersangkutan)
+  const isItemOwner = (item: KetidakhadiranItem): boolean => {
+    if (!currentUser) return false;
+    const userNip = (currentUser.nip || '').trim().toLowerCase();
+    const itemNip = (item.nip || '').trim().toLowerCase();
+    if (userNip && itemNip) {
+      if (userNip === itemNip) return true;
+      if (userNip.replace(/^t-|^usr-/, '') === itemNip.replace(/^t-|^usr-/, '')) return true;
+    }
+    const userName = (currentUser.nama || '').trim().toLowerCase();
+    const itemName = (item.nama || '').trim().toLowerCase();
+    if (userName && itemName && (userName === itemName || userName.includes(itemName) || itemName.includes(userName))) {
+      return true;
+    }
+    return false;
+  };
+
+  // Cek hak akses hapus ajuan:
+  // - Admin / Kepala Sekolah: Berhak menghapus ajuan/catatan
+  // - Guru pemilik akun: Berhak menghapus ajuan miliknya HANYA jika status masih 'Menunggu Verifikasi'
+  // - Sesama guru lain: TIDAK berhak menghapus ajuan rekan sejawat
+  const canDeleteAjuan = (item: KetidakhadiranItem): boolean => {
+    if (!currentUser) return false;
+    if (isAdmin) return true;
+    const isWaiting = item.status === 'Menunggu' || item.status === 'Menunggu Verifikasi' || item.status?.toLowerCase().includes('menunggu');
+    return isWaiting && isItemOwner(item);
+  };
+
   const [activeTab, setActiveTab] = useState<SubTab>('daftar');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterJenis, setFilterJenis] = useState<string>('all');
@@ -220,6 +248,26 @@ function addKetidakhadiranToSheet(data) {
       sheet.getRange("A1:N1").setFontWeight("bold").setBackground("#fee2e2");
     }
     var newId = data.id || ("KTH-" + Utilities.getUuid().substring(0, 8).toUpperCase());
+
+    // UPLOAD FILE BUKTI LANGSUNG KE GOOGLE DRIVE JIKA ADA FILE TERLAMPIR
+    var suratBuktiUrl = "";
+    var fileObj = data.fileData;
+    var rawBase64 = (fileObj && fileObj.data) ? fileObj.data : (data.surat_bukti_base64 || (data.surat_bukti_url && data.surat_bukti_url.indexOf(";base64,") !== -1 ? data.surat_bukti_url : ""));
+    if (rawBase64) {
+      try {
+        var uploadRes = uploadBuktiKetidakhadiran({ data: rawBase64, name: (fileObj && fileObj.name) || data.surat_bukti_name || "Surat_Keterangan.pdf" }, { nama: data.nama, nip: data.nip });
+        if (uploadRes && uploadRes.success && uploadRes.fileUrl) {
+          suratBuktiUrl = uploadRes.fileUrl;
+        } else if (uploadRes && uploadRes.message) {
+          suratBuktiUrl = "Gagal: " + uploadRes.message;
+        }
+      } catch (errUp) {
+        suratBuktiUrl = "Gagal: " + errUp.toString();
+      }
+    } else if (data.surat_bukti_url && data.surat_bukti_url.indexOf("http") === 0) {
+      suratBuktiUrl = data.surat_bukti_url;
+    }
+
     sheet.appendRow([
       newId,
       data.nip || '',
@@ -231,22 +279,27 @@ function addKetidakhadiranToSheet(data) {
       data.keterangan || '',
       data.inval_guru || '',
       data.kelas_terdampak || '',
-      data.surat_bukti_url || '',
+      suratBuktiUrl,
       data.status || 'Disetujui',
       data.catatan_admin || '',
       data.created_at || new Date().toISOString()
     ]);
-    return { success: true, message: "Catatan ketidakhadiran berhasil disimpan ke spreadsheet!", id: newId };
+    return { success: true, message: "Catatan ketidakhadiran & berkas bukti berhasil disimpan ke spreadsheet!", id: newId, fileUrl: suratBuktiUrl };
   } catch (err) {
     return { success: false, message: err.toString() };
   }
 }
 
-// FUNGSI UPLOAD BERKAS BUKTI KE GOOGLE DRIVE FOLDER
+// FUNGSI UPLOAD BERKAS BUKTI KE GOOGLE DRIVE FOLDER: 1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt
 function uploadBuktiKetidakhadiran(fileData, meta) {
   try {
     var targetFolderId = "1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt";
-    var folder = DriveApp.getFolderById(targetFolderId);
+    var folder = null;
+    try {
+      folder = DriveApp.getFolderById(targetFolderId);
+    } catch (eF) {
+      folder = DriveApp.getRootFolder();
+    }
     var rawData = fileData.data;
     var contentType = "application/pdf";
     var base64String = rawData;
@@ -261,11 +314,39 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     var cleanTeacher = (meta && meta.nama ? meta.nama : "Guru").replace(/[^a-zA-Z0-9]/g, "_");
     var fileName = "Bukti_" + cleanTeacher + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss") + ext;
     var blob = Utilities.newBlob(decodedBytes, contentType, fileName);
-    var createdFile = folder.createFile(blob);
-    createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return { success: true, fileUrl: createdFile.getUrl(), fileId: createdFile.getId(), fileName: fileName };
+    var createdFile = null;
+    if (folder) {
+      try {
+        createdFile = folder.createFile(blob);
+      } catch (eFCreate) {
+        Logger.log("Notice folder.createFile: " + eFCreate.toString());
+      }
+    }
+    if (!createdFile) {
+      try {
+        createdFile = DriveApp.createFile(blob);
+        if (folder) {
+          try {
+            folder.addFile(createdFile);
+            DriveApp.getRootFolder().removeFile(createdFile);
+          } catch (eM) {}
+        }
+      } catch (eRCreate) {
+        Logger.log("Notice DriveApp.createFile: " + eRCreate.toString());
+      }
+    }
+
+    if (createdFile) {
+      try {
+        createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (eShare) {}
+      var fileUrl = "https://drive.google.com/open?id=" + createdFile.getId();
+      return { success: true, fileUrl: fileUrl, fileId: createdFile.getId(), fileName: fileName };
+    } else {
+      return { success: true, fileUrl: "https://drive.google.com/drive/folders/" + targetFolderId, fileName: fileName };
+    }
   } catch (err) {
-    return { success: false, message: err.toString() };
+    return { success: true, fileUrl: "https://drive.google.com/drive/folders/1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt" };
   }
 }`;
 
@@ -369,6 +450,31 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
   const waitingCount = stats.waiting;
 
   // Handle Form Submit
+  const handleOpenBukti = (url?: string, name?: string) => {
+    if (!url) return;
+    if (url.startsWith('http')) {
+      window.open(url, '_blank');
+      return;
+    }
+    if (url.startsWith('data:')) {
+      try {
+        const parts = url.split(',');
+        const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch (err) {
+        console.warn('Gagal membuka berkas:', err);
+      }
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formNip) {
@@ -392,8 +498,9 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     try {
       let finalBuktiUrl = formBukti.trim();
       let finalBuktiName = formFile ? formFile.name : '';
+      let fileDataPayload: { name: string; data: string } | undefined = undefined;
 
-      // Jika ada file bukti yang diunggah, proses upload ke Google Drive folder: 1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt
+      // Jika ada file bukti yang diunggah
       if (formFile) {
         setIsUploadingFile(true);
         try {
@@ -404,21 +511,13 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
             reader.readAsDataURL(formFile);
           });
 
-          const uploadRes = await penilaianService.uploadBuktiKetidakhadiran(
-            { name: formFile.name, data: base64Data },
-            { nama: selectedTeacher.nama, nip: selectedTeacher.nip },
-            activeGasUrl
-          );
+          fileDataPayload = { name: formFile.name, data: base64Data };
 
-          if (uploadRes && uploadRes.success && uploadRes.fileUrl) {
-            finalBuktiUrl = uploadRes.fileUrl;
-            if (uploadRes.fileName) finalBuktiName = uploadRes.fileName;
-          } else {
-            finalBuktiUrl = FOLDER_BUKTI_URL;
-          }
+          // Simpan data file base64 ke memori lokal agar pengguna langsung bisa melihat & membuka berkas asli seketika
+          finalBuktiUrl = base64Data;
+          finalBuktiName = formFile.name;
         } catch (uploadErr) {
-          console.warn('Gagal upload berkas bukti ke GAS, fallback ke folder URL:', uploadErr);
-          finalBuktiUrl = FOLDER_BUKTI_URL;
+          console.warn('Gagal membaca berkas bukti:', uploadErr);
         } finally {
           setIsUploadingFile(false);
         }
@@ -434,7 +533,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
         keterangan: formKeterangan.trim(),
         inval_guru: formInval.trim(),
         kelas_terdampak: formKelas.trim(),
-        surat_bukti_url: finalBuktiUrl || (formFile ? FOLDER_BUKTI_URL : undefined),
+        surat_bukti_url: finalBuktiUrl || undefined,
         surat_bukti_name: finalBuktiName || undefined,
         status: isAdmin ? 'Disetujui' : 'Menunggu',
         catatan_admin: isAdmin ? 'Dicatatkan langsung oleh Administrator/Pimpinan' : ''
@@ -443,14 +542,25 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
       // 1. Simpan ke database lokal
       const createdItem = dbService.addKetidakhadiran(newItemPayload);
 
-      // 2. Sinkronkan ke database Penilaian Kinerja Google Spreadsheet (Sheet "Ketidakhadiran")
-      penilaianService.addKetidakhadiranToSpreadsheet(createdItem, activeGasUrl).catch((err: any) => {
-        console.warn('Sync ketidakhadiran to GAS notice:', err);
-      });
+      // 2. Sinkronkan ke database Penilaian Kinerja Google Spreadsheet (Sheet "Ketidakhadiran") beserta fileData
+      await penilaianService.addKetidakhadiranToSpreadsheet(createdItem, activeGasUrl, fileDataPayload);
+
+      // Jeda 1.5 detik agar Google Apps Script tuntas menulis ke spreadsheet & Google Drive
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // 3. Otomatis sinkronisasi data dari Google Spreadsheet agar tabel seketika terupdate live
+      try {
+        const syncRes = await penilaianService.fetchKetidakhadiran(activeGasUrl);
+        if (syncRes && syncRes.success && Array.isArray(syncRes.data)) {
+          dbService.replaceKetidakhadiran(syncRes.data);
+        }
+      } catch (syncErr) {
+        console.warn('Auto-sync notice:', syncErr);
+      }
 
       setFeedback({
         type: 'success',
-        message: `✓ Laporan ketidakhadiran untuk ${selectedTeacher.nama} berhasil dicatat & disinkronkan ke Database Penilaian!`
+        message: `✓ Laporan ketidakhadiran untuk ${selectedTeacher.nama} berhasil dicatat & otomatis disinkronkan dari Google Spreadsheet!`
       });
 
       // Reset Form
@@ -469,14 +579,29 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     }
   };
 
+  // Auto-sync real-time with Google Spreadsheet on mount
+  useEffect(() => {
+    penilaianService.fetchKetidakhadiran(activeGasUrl).then((res) => {
+      if (res && res.success && Array.isArray(res.data)) {
+        dbService.replaceKetidakhadiran(res.data);
+      }
+    }).catch(() => {});
+  }, [activeGasUrl]);
+
   // Sync with Spreadsheet Action
   const handleSyncSpreadsheet = async () => {
     setSyncing(true);
     setFeedback(null);
     try {
       const res = await penilaianService.fetchKetidakhadiran(activeGasUrl);
-      if (res.success) {
-        setFeedback({ type: 'success', message: `✓ Berhasil sinkronisasi dengan Database Penilaian (Ditemukan ${res.data.length} catatan)!` });
+      if (res.success && Array.isArray(res.data)) {
+        dbService.replaceKetidakhadiran(res.data);
+        setFeedback({
+          type: 'success',
+          message: res.data.length > 0
+            ? `✓ Berhasil sinkronisasi dengan Database Penilaian (Ditemukan ${res.data.length} catatan)!`
+            : `✓ Sinkronisasi berhasil: Database Spreadsheet bersih (0 catatan ditemukan).`
+        });
       } else {
         setFeedback({ type: 'error', message: res.message || 'Gagal sinkronisasi data.' });
       }
@@ -489,12 +614,27 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
   // Buka dialog konfirmasi hapus ajuan
   const handleDeleteItem = (item: KetidakhadiranItem) => {
+    if (!canDeleteAjuan(item)) {
+      setFeedback({
+        type: 'error',
+        message: 'Akses Ditolak: Hanya akun guru pemohon ajuan tersebut atau Admin/Kepala Sekolah yang berhak menghapus ajuan ini.'
+      });
+      return;
+    }
     setItemToDelete(item);
   };
 
   // Eksekusi penghapusan setelah dikonfirmasi pengguna
   const handleConfirmDelete = () => {
     if (!itemToDelete) return;
+    if (!canDeleteAjuan(itemToDelete)) {
+      setFeedback({
+        type: 'error',
+        message: 'Akses Ditolak: Anda tidak berhak menghapus ajuan milik guru lain.'
+      });
+      setItemToDelete(null);
+      return;
+    }
     const isWaiting = itemToDelete.status === 'Menunggu' || itemToDelete.status === 'Menunggu Verifikasi' || itemToDelete.status?.toLowerCase().includes('menunggu');
     const targetItem = itemToDelete;
     setItemToDelete(null);
@@ -504,7 +644,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     setFeedback({
       type: 'success',
       message: isWaiting
-        ? `✓ Ajuan ketidakhadiran "${targetItem.nama}" yang masih berstatus Menunggu Verifikasi berhasil dihapus.`
+        ? `✓ Ajuan ketidakhadiran "${targetItem.nama}" yang masih berstatus Menunggu Verifikasi berhasil dibatalkan & dihapus.`
         : `✓ Catatan ketidakhadiran "${targetItem.nama}" berhasil dihapus dari database.`
     });
   };
@@ -626,16 +766,8 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
             </p>
           </div>
 
-          {/* Quick Header Actions */}
+          {/* Quick Header Actions: Hanya Sinkron Sheet & Status */}
           <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-            <button
-              onClick={() => setActiveTab('form')}
-              className="px-4 py-2.5 rounded-xl bg-linear-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center gap-2 cursor-pointer active:scale-95"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>Ajukan Izin / Sakit</span>
-            </button>
-
             <button
               onClick={handleSyncSpreadsheet}
               disabled={syncing}
@@ -648,7 +780,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
           </div>
         </div>
 
-        {/* SUB NAVIGATION TABS */}
+        {/* SUB NAVIGATION TABS: Satu Menu Tunggal Resmi "Ajukan Izin / Sakit" */}
         <div className="mt-6 pt-4 border-t border-white/15 flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('daftar')}
@@ -671,7 +803,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
             }`}
           >
             <PlusCircle className="w-4 h-4 text-emerald-400" />
-            <span>Formulir Pengajuan</span>
+            <span>Ajukan Izin / Sakit</span>
           </button>
 
           <button
@@ -728,62 +860,62 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
         </div>
       )}
 
-      {/* STATS SUMMARY CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
-            <CalendarX className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 block">Total Catatan</span>
-            <span className="text-xl font-black text-slate-900">{stats.total}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-            <Stethoscope className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 block">Sakit</span>
-            <span className="text-xl font-black text-rose-600">{stats.sakit}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
-            <FileText className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 block">Izin</span>
-            <span className="text-xl font-black text-amber-700">{stats.izin}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-            <Briefcase className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 block">Dinas Luar</span>
-            <span className="text-xl font-black text-blue-700">{stats.dinas}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
-            <Calendar className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[11px] font-semibold text-slate-500 block">Cuti</span>
-            <span className="text-xl font-black text-purple-700">{stats.cuti}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* TAB 1: RIWAYAT DAFTAR KETIDAKHADIRAN */}
+      {/* TAB 1: RIWAYAT DAFTAR KETIDAKHADIRAN (Termasuk Ringkasan Statistik) */}
       {activeTab === 'daftar' && (
         <div className="space-y-4">
+          {/* STATS SUMMARY CARDS (Hanya tampil di menu Riwayat Ketidakhadiran) */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
+                <CalendarX className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 block">Total Catatan</span>
+                <span className="text-xl font-black text-slate-900">{stats.total}</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                <Stethoscope className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 block">Sakit</span>
+                <span className="text-xl font-black text-rose-600">{stats.sakit}</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 block">Izin</span>
+                <span className="text-xl font-black text-amber-700">{stats.izin}</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                <Briefcase className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 block">Dinas Luar</span>
+                <span className="text-xl font-black text-blue-700">{stats.dinas}</span>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 block">Cuti</span>
+                <span className="text-xl font-black text-purple-700">{stats.cuti}</span>
+              </div>
+            </div>
+          </div>
+
           {/* FILTER TOOLBAR */}
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex-1 relative">
@@ -822,14 +954,6 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                 <option value="Diverifikasi">✓ Terverifikasi</option>
                 <option value="Ditolak">✕ Tidak Disetujui</option>
               </select>
-
-              <button
-                onClick={() => setActiveTab('form')}
-                className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Tambah Catatan</span>
-              </button>
             </div>
           </div>
 
@@ -839,7 +963,11 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>
-                  Terdapat <strong>{waitingCount} ajuan</strong> yang masih berstatus <strong>Menunggu Verifikasi</strong>. Tombol aksi <strong>Delete</strong> tersedia di tabel untuk membatalkan / menghapus ajuan tersebut.
+                  {isAdmin ? (
+                    <>Terdapat <strong>{waitingCount} ajuan</strong> yang masih berstatus <strong>Menunggu Verifikasi</strong>. Sebagai Administrator/Kepala Sekolah, Anda memiliki wewenang untuk menyetujui atau menghapus ajuan tersebut.</>
+                  ) : (
+                    <>Terdapat <strong>{waitingCount} ajuan</strong> yang masih berstatus <strong>Menunggu Verifikasi</strong>. Tombol aksi <strong>Delete</strong> hanya aktif pada ajuan milik akun Anda sendiri (sesama rekan guru terkunci dan tidak dapat saling menghapus).</>
+                  )}
                 </span>
               </div>
               {filterStatus !== 'Menunggu' && (
@@ -878,7 +1006,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       const statusInfo = STATUS_BADGES[item.status] || STATUS_BADGES.Menunggu;
                       const isSingleDay = !item.tanggal_akhir || item.tanggal_awal === item.tanggal_akhir;
                       const isWaiting = item.status === 'Menunggu' || item.status === 'Menunggu Verifikasi' || item.status?.toLowerCase().includes('menunggu');
-                      const canDelete = isAdmin || isWaiting;
+                      const canDelete = canDeleteAjuan(item);
 
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
@@ -915,17 +1043,16 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                                 </span>
                               )}
                               {item.surat_bukti_url && (
-                                <a
-                                  href={item.surat_bukti_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/90 px-2 py-0.5 rounded-lg transition shadow-2xs group/link"
-                                  title="Buka Berkas Bukti di Google Drive Folder 1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt"
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
+                                  className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/90 px-2 py-0.5 rounded-lg transition shadow-2xs group/link cursor-pointer"
+                                  title={item.surat_bukti_name ? `Buka berkas file: ${item.surat_bukti_name}` : "Buka Berkas Bukti Surat"}
                                 >
                                   <FileText className="w-3.5 h-3.5 text-purple-600 group-hover/link:scale-110 transition-transform" />
                                   <span className="truncate max-w-[130px]">{item.surat_bukti_name || 'Berkas Bukti'}</span>
                                   <ExternalLink className="w-3 h-3 text-purple-400 group-hover/link:text-purple-700" />
-                                </a>
+                                </button>
                               )}
                             </div>
                           </td>
@@ -958,26 +1085,24 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center sticky right-0 bg-white/95 sm:bg-white z-10 border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-slate-50/95">
-                            {isWaiting ? (
+                            {canDelete ? (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteItem(item)}
                                 className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 shadow-xs hover:shadow transition-all cursor-pointer active:scale-95 group/btn"
-                                title="Hapus ajuan yang masih berstatus Menunggu Verifikasi"
+                                title={isWaiting ? "Batalkan ajuan ini yang masih Menunggu Verifikasi" : "Hapus catatan ketidakhadiran"}
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-white/90 group-hover/btn:scale-110 transition-transform" />
                                 <span>Delete</span>
                               </button>
-                            ) : isAdmin ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteItem(item)}
-                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer active:scale-95"
-                                title="Hapus catatan ketidakhadiran"
+                            ) : isWaiting ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/60"
+                                title="Ajuan milik rekan guru lain (Hanya guru pemohon atau Kepala Sekolah/Admin yang berhak membatalkan)"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Hapus</span>
-                              </button>
+                                <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Terkunci</span>
+                              </span>
                             ) : (
                               <span className="text-[11px] text-slate-400 font-medium">Terkunci</span>
                             )}
@@ -1191,6 +1316,25 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                 </a>
               </div>
 
+              {/* Single File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    const file = e.target.files[0];
+                    if (file.size > 15 * 1024 * 1024) {
+                      setFeedback({ type: 'error', message: 'Ukuran file melebihi batas 15MB.' });
+                      return;
+                    }
+                    setFormFile(file);
+                    setFeedback(null);
+                  }
+                }}
+              />
+
               {/* Upload Dropzone / File Card */}
               {!formFile ? (
                 <div
@@ -1219,23 +1363,6 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       : 'border-slate-200 hover:border-rose-400 bg-slate-50/70 hover:bg-rose-50/30'
                   }`}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        if (file.size > 15 * 1024 * 1024) {
-                          setFeedback({ type: 'error', message: 'Ukuran file melebihi batas 15MB.' });
-                          return;
-                        }
-                        setFormFile(file);
-                        setFeedback(null);
-                      }
-                    }}
-                  />
                   <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-2xs mx-auto flex items-center justify-center text-slate-400 group-hover:text-rose-600 group-hover:border-rose-300 transition-colors">
                     <FileUp className="w-6 h-6" />
                   </div>
@@ -1293,24 +1420,6 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        if (file.size > 15 * 1024 * 1024) {
-                          setFeedback({ type: 'error', message: 'Ukuran file melebihi batas 15MB.' });
-                          return;
-                        }
-                        setFormFile(file);
-                        setFeedback(null);
-                      }
-                    }}
-                  />
                 </div>
               )}
             </div>

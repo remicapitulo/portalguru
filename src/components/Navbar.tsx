@@ -84,23 +84,41 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img
               src={config.school_logo_url}
               alt="Logo Sekolah"
-              className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-xl shrink-0 border border-slate-200/60 p-0.5 bg-white shadow-2xs"
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-xl shrink-0 border border-slate-200/80 p-0.5 bg-white shadow-2xs"
             />
           ) : null}
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              <span className="font-black text-sm sm:text-base lg:text-lg text-slate-900 tracking-tight truncate font-sans">
+          <div className="flex flex-col min-w-0 justify-center">
+            {/* Top row: School Name + Portal Guru Badge */}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <span className="font-black text-xs sm:text-base lg:text-lg text-slate-900 tracking-tight truncate font-sans">
                 {config.school_name.toUpperCase()}
               </span>
-              <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                Portal Guru
+              </span>
+            </div>
+
+            {/* Mobile Sub-row: Badges in a single neat horizontal row */}
+            <div className="flex sm:hidden items-center gap-1.5 mt-0.5 min-w-0">
+              <span className="inline-flex items-center px-1.5 py-0.2 rounded-md text-[9.5px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                Portal Guru
+              </span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
+                <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
                 TA {config.academic_year}
               </span>
             </div>
 
-            <p className="text-xs text-slate-500 hidden sm:block truncate mt-0.5">
-              {tabTitles[currentTab] || 'Portal Administrasi Guru Terpadu'}
-            </p>
+            {/* Desktop Sub-row: Menu name side-by-side with TA badge */}
+            <div className="hidden sm:flex items-center gap-2 mt-0.5 min-w-0">
+              <p className="text-xs font-semibold text-slate-500 truncate">
+                {tabTitles[currentTab] || 'Portal Administrasi Guru Terpadu'}
+              </p>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                TA {config.academic_year}
+              </span>
+            </div>
           </div>
         </div>
       </div>

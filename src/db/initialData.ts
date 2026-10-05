@@ -21,8 +21,8 @@ export const initialConfig: SchoolConfig = {
   drive_folder_perangkat_id: '1sgMfoLIvjrjRbBO6__inK2ZQ4d7XrJcp',
   drive_folder_perangkat_name: 'Folder Perangkat Pembelajaran',
   eflayer_apps_script_url: 'https://script.google.com/macros/s/AKfycbzwl296baWL4h3gCVlkWYzcEocV-wO3i-V0SZykFD5N29xBsyq2XZIjvGjv_NPzbQsW/exec',
-  penilaian_spreadsheet_id: '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY',
-  penilaian_apps_script_url: 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
+  penilaian_spreadsheet_id: '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU',
+  penilaian_apps_script_url: 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec'
 };
 
 // Data pengguna riil sekolah sesuai sheet "user" & "usulan_guru"
@@ -732,92 +732,8 @@ export const initialJurnalList: JurnalItem[] = [
   }
 ];
 
-export const initialKetidakhadiranList: KetidakhadiranItem[] = [
-  {
-    id: 'KTH-001',
-    rowIndex: 2,
-    nip: '02.20.09.112',
-    nama: 'Nilam Cahya, S.Pd',
-    mapel: 'Matematika',
-    tanggal_awal: '2026-10-02',
-    tanggal_akhir: '2026-10-02',
-    jenis: 'Dinas Luar',
-    keterangan: 'Menghadiri Pelatihan Kurikulum & Bedah Asesmen MGMP Matematika Tingkat Kota Depok',
-    inval_guru: 'M. Miftahur Rahman, S.I',
-    kelas_terdampak: 'Kelas 7A, 7B',
-    status: 'Disetujui',
-    catatan_admin: 'Disposisi Kepala Sekolah: Surat Tugas resmi diterbitkan.',
-    created_at: '2026-10-01T08:15:00.000Z'
-  },
-  {
-    id: 'KTH-002',
-    rowIndex: 3,
-    nip: '02.18.07.135',
-    nama: 'Novi Mulafaturrochmah, S.Pd.',
-    mapel: 'Bahasa Indonesia',
-    tanggal_awal: '2026-09-29',
-    tanggal_akhir: '2026-09-30',
-    jenis: 'Sakit',
-    keterangan: 'Sakit demam & radang tenggorokan (Surat Istirahat Dokter 2 Hari)',
-    inval_guru: 'Syifa Fauziah, S.Pd.I',
-    kelas_terdampak: 'Kelas 8A, 8C',
-    status: 'Disetujui',
-    catatan_admin: 'Surat dokter terverifikasi. Syafakillah.',
-    created_at: '2026-09-29T06:30:00.000Z'
-  },
-  {
-    id: 'KTH-003',
-    rowIndex: 4,
-    nip: '03.25.07.63',
-    nama: 'Chintya Handayani, M.Pd',
-    mapel: 'IPS',
-    tanggal_awal: '2026-10-03',
-    tanggal_akhir: '2026-10-03',
-    jenis: 'Izin',
-    keterangan: 'Izin mengurus administrasi keluarga mendesak dan kontrol kesehatan orang tua',
-    inval_guru: 'Drs. H. Ahmad Fauzi, M.Pd',
-    kelas_terdampak: 'Kelas 9B',
-    status: 'Disetujui',
-    catatan_admin: 'Telah dikoordinasikan dengan tim kurikulum untuk tugas mandiri.',
-    created_at: '2026-10-02T14:20:00.000Z'
-  },
-  {
-    id: 'KTH-004',
-    rowIndex: 5,
-    nip: '02.13.08.92',
-    nama: 'Syifa Fauziah, S.Pd.I',
-    mapel: 'Al Qur\'an',
-    tanggal_awal: '2026-10-06',
-    tanggal_akhir: '2026-10-06',
-    jenis: 'Dinas Luar',
-    keterangan: 'Pendampingan siswa SMPIT Pondok Duta pada Lomba MHQ Pentas PAI Tingkat Wilayah',
-    inval_guru: 'M. Miftahur Rahman, S.I',
-    kelas_terdampak: 'Kelas 7C, 8A',
-    surat_bukti_url: 'https://drive.google.com/drive/folders/1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt',
-    surat_bukti_name: 'Surat_Tugas_Pendampingan_MHQ.pdf',
-    status: 'Disetujui',
-    catatan_admin: 'Semoga tim santri Pondok Duta meraih hasil terbaik.',
-    created_at: '2026-10-03T10:00:00.000Z'
-  },
-  {
-    id: 'KTH-005',
-    rowIndex: 6,
-    nip: '02.18.07.135',
-    nama: 'M. Miftahur Rahman, S.Pd.',
-    mapel: 'Al Qur\'an',
-    tanggal_awal: '2026-10-04',
-    tanggal_akhir: '2026-10-04',
-    jenis: 'Izin',
-    keterangan: 'sakit',
-    inval_guru: 'Nurhasanah, S.Pd',
-    kelas_terdampak: 'kelas 7 Battuta',
-    surat_bukti_url: 'https://drive.google.com/drive/folders/1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt',
-    surat_bukti_name: 'Surat_Keterangan_Sakit.pdf',
-    status: 'Menunggu',
-    catatan_admin: '',
-    created_at: '2026-10-04T07:30:00.000Z'
-  }
-];
+// Data Ketidakhadiran Guru & Tendik (Kosong secara default, bersumber langsung dari Google Spreadsheet)
+export const initialKetidakhadiranList: KetidakhadiranItem[] = [];
 
 export const initialDatabase: AppDatabase = {
   config: initialConfig,

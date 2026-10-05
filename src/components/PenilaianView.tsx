@@ -212,9 +212,6 @@ export const PenilaianView: React.FC<PenilaianViewProps> = ({
               <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-400/30">
                 Sistem Penilaian Kinerja Diktendik
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-slate-300 font-mono">
-                Sheet: {PENILAIAN_SPREADSHEET_ID.substring(0, 10)}...
-              </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-slate-300">
                 Tahun Ajaran {academicYear}
               </span>
@@ -232,10 +229,12 @@ export const PenilaianView: React.FC<PenilaianViewProps> = ({
 
           {/* Quick Header Actions */}
           <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Web API GAS Aktif</span>
-            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Web API GAS Aktif</span>
+              </div>
+            )}
 
             {isAdmin && (
               <button

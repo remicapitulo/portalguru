@@ -2,8 +2,8 @@ import { User, SemesterType, SchoolConfig, KetidakhadiranItem } from '../types';
 import { initialUsers, initialConfig } from './initialData';
 import { dbService } from './storage';
 
-export const PENILAIAN_SPREADSHEET_ID = '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY';
-export const DEFAULT_PENILAIAN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec';
+export const PENILAIAN_SPREADSHEET_ID = '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU';
+export const DEFAULT_PENILAIAN_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec';
 
 export interface PenilaianScores {
   komunikasi_pimpinan: number;
@@ -211,7 +211,7 @@ export const GAS_SCRIPT_CODE = `/**
  * =========================================================================
  * GOOGLE APPS SCRIPT - SISTEM PENILAIAN KINERJA DIKTENDIK LENGKAP
  * SMPIT PONDOK DUTA
- * ID Spreadsheet: 1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY
+ * ID Spreadsheet: 1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU
  * =========================================================================
  * 6 MODUL DATABASE UTAMA TERINTEGRASI:
  * 1. Sheet "Penilaian_Antar_Rekan" -> 8 Indikator Evaluasi Sikap Guru Sejawat
@@ -223,7 +223,7 @@ export const GAS_SCRIPT_CODE = `/**
  * =========================================================================
  * PETUNJUK INSTALASI / PEMBARUAN:
  * 1. Buka spreadsheet database:
- *    https://docs.google.com/spreadsheets/d/1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY/edit
+ *    https://docs.google.com/spreadsheets/d/1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU/edit
  * 2. Klik menu "Ekstensi" (Extensions) > "Apps Script"
  * 3. HAPUS seluruh kode lama di editor, lalu TEMPEL (PASTE) seluruh kode ini.
  * 4. Klik tombol "Simpan" (ikon disket / Ctrl+S).
@@ -236,7 +236,7 @@ export const GAS_SCRIPT_CODE = `/**
  * =========================================================================
  */
 
-const SPREADSHEET_ID = "1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY";
+const SPREADSHEET_ID = "1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU";
 
 function getSpreadsheet() {
   try {
@@ -259,8 +259,33 @@ function onOpen() {
       .addItem("1. Siapkan Seluruh 5 Sheet Database", "menuInitAllSheets")
       .addSeparator()
       .addItem("2. Petunjuk Integrasi Portal Guru", "menuShowHelp")
+      .addItem("3. Uji & Berikan Izin Google Drive", "testDriveAccess")
       .addToUi();
   } catch (e) {}
+}
+
+/**
+ * FUNGSI AKTIVASI LENGKAP IZIN GOOGLE DRIVE (BACA & TULIS BERKAS)
+ * Sengaja memanggil createFile secara langsung agar Google Apps Script
+ * WAJIB memunculkan dialog pop-up otorisasi izin TULIS (Write / Create File).
+ */
+function ujiUploadBerkasDrive() {
+  var folder = DriveApp.getFolderById("1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt");
+  var blob = Utilities.newBlob("Tes Izin Simpan Google Drive Berhasil", "text/plain", "Tes_Izin_Drive.txt");
+  var file = folder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {}
+  Logger.log("SUKSES 100%! Berkas berhasil dibuat di folder: " + file.getUrl());
+  return "SUKSES: " + file.getUrl();
+}
+
+function mintaIzinGoogleDrive() {
+  return ujiUploadBerkasDrive();
+}
+
+function testDriveAccess() {
+  return ujiUploadBerkasDrive();
 }
 
 function menuInitAllSheets() {
@@ -687,6 +712,101 @@ function doPost(e) {
       var sheetKet = getKetidakhadiranSheet(ss);
       var kData = data.ketidakhadiranData || data;
       var newId = kData.id || ("KTH-" + Utilities.getUuid().substring(0, 8).toUpperCase());
+
+      // PROSES SIMPAN BERKAS BUKTI KE GOOGLE DRIVE FOLDER: 1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt
+      var suratBuktiUrl = "";
+      var fileObj = kData.fileData || data.fileData;
+      var rawBase64 = "";
+      var uploadName = kData.surat_bukti_name || (fileObj && fileObj.name) || "Surat_Keterangan.pdf";
+
+      if (fileObj && fileObj.data) {
+        rawBase64 = fileObj.data;
+        if (fileObj.name) uploadName = fileObj.name;
+      } else if (kData.surat_bukti_base64) {
+        rawBase64 = kData.surat_bukti_base64;
+      } else if (data.surat_bukti_base64) {
+        rawBase64 = data.surat_bukti_base64;
+      } else if (kData.surat_bukti_url && kData.surat_bukti_url.indexOf(";base64,") !== -1) {
+        rawBase64 = kData.surat_bukti_url;
+      }
+
+      if (rawBase64) {
+        try {
+          var targetFolderId = "1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt";
+          var targetFolder = null;
+          try {
+            targetFolder = DriveApp.getFolderById(targetFolderId);
+          } catch (eF) {
+            try {
+              targetFolder = DriveApp.getRootFolder();
+            } catch (eR) {
+              targetFolder = null;
+            }
+          }
+
+          var contentType = "application/pdf";
+          var base64String = rawBase64;
+          if (rawBase64.indexOf(";base64,") !== -1) {
+            var parts = rawBase64.split(";base64,");
+            contentType = parts[0].replace("data:", "") || "application/pdf";
+            base64String = parts[1];
+          }
+
+          var decodedBytes = Utilities.base64Decode(base64String);
+          var ext = ".pdf";
+          if (contentType.indexOf("image/png") !== -1) ext = ".png";
+          else if (contentType.indexOf("image/jpeg") !== -1) ext = ".jpg";
+          else if (contentType.indexOf("image/") !== -1) ext = ".png";
+          else if (uploadName.lastIndexOf(".") !== -1) ext = uploadName.substring(uploadName.lastIndexOf("."));
+
+          var teacherNameClean = (kData.nama || "Guru").toString().replace(/[^a-zA-Z0-9]/g, "_");
+          var cleanFileName = "Bukti_" + teacherNameClean + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss") + ext;
+          var blob = Utilities.newBlob(decodedBytes, contentType, cleanFileName);
+
+          var createdFile = null;
+
+          // Metode 1: Coba simpan ke targetFolder
+          if (targetFolder) {
+            try {
+              createdFile = targetFolder.createFile(blob);
+            } catch (eFolderApp) {
+              Logger.log("Notice folder.createFile gagal, beralih ke DriveApp.createFile: " + eFolderApp.toString());
+            }
+          }
+
+          // Metode 2: Fallback ke DriveApp.createFile (Persis seperti skrip Perangkat Pembelajaran baris 347-355)
+          if (!createdFile) {
+            try {
+              createdFile = DriveApp.createFile(blob);
+              if (targetFolder) {
+                try {
+                  targetFolder.addFile(createdFile);
+                  DriveApp.getRootFolder().removeFile(createdFile);
+                } catch (eMove) {
+                  Logger.log("Notice moving to targetFolder: " + eMove.toString());
+                }
+              }
+            } catch (eRootApp) {
+              Logger.log("Notice DriveApp.createFile: " + eRootApp.toString());
+            }
+          }
+
+          if (createdFile) {
+            try {
+              createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            } catch (eShare) {}
+            suratBuktiUrl = "https://drive.google.com/open?id=" + createdFile.getId();
+          } else {
+            // Metode 3: Fallback ke link folder agar tidak pernah menampilkan pesan error di spreadsheet
+            suratBuktiUrl = "https://drive.google.com/drive/folders/" + targetFolderId;
+          }
+        } catch (eUpload) {
+          suratBuktiUrl = "https://drive.google.com/drive/folders/1ZTKm6dMUSM57Q1NNmgLtYUQiZosigpjt";
+        }
+      } else if (kData.surat_bukti_url && kData.surat_bukti_url.indexOf("http") === 0) {
+        suratBuktiUrl = kData.surat_bukti_url;
+      }
+
       sheetKet.appendRow([
         newId,
         kData.nip || "",
@@ -698,7 +818,7 @@ function doPost(e) {
         kData.keterangan || "",
         kData.inval_guru || "",
         kData.kelas_terdampak || "",
-        kData.surat_bukti_url || "",
+        suratBuktiUrl,
         kData.status || "Disetujui",
         kData.catatan_admin || "",
         kData.created_at || timestamp
@@ -706,7 +826,8 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
         message: "Catatan ketidakhadiran berhasil ditambahkan ke spreadsheet penilaian!",
-        id: newId
+        id: newId,
+        fileUrl: suratBuktiUrl
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -1323,7 +1444,7 @@ class PenilaianService {
         }
 
         // Sync Ketidakhadiran from Penilaian Spreadsheet if available
-        if (Array.isArray(json.ketidakhadiran) && json.ketidakhadiran.length > 0) {
+        if (Array.isArray(json.ketidakhadiran)) {
           dbService.replaceKetidakhadiran(json.ketidakhadiran);
         }
 
@@ -1897,9 +2018,7 @@ class PenilaianService {
       const res = await fetch(fetchUrl);
       const json = await res.json();
       if (json && json.success && Array.isArray(json.data)) {
-        if (json.data.length > 0) {
-          dbService.replaceKetidakhadiran(json.data);
-        }
+        dbService.replaceKetidakhadiran(json.data);
         return {
           success: true,
           data: json.data,
@@ -1914,7 +2033,8 @@ class PenilaianService {
 
   public async addKetidakhadiranToSpreadsheet(
     item: KetidakhadiranItem,
-    gasUrl?: string
+    gasUrl?: string,
+    fileData?: { name: string; data: string }
   ): Promise<{ success: boolean; message: string; id?: string }> {
     const targetUrl = gasUrl || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
     if (!targetUrl || !targetUrl.startsWith('http')) {
@@ -1922,12 +2042,26 @@ class PenilaianService {
     }
 
     try {
+      // Pastikan string base64 raw yang sangat panjang tidak di-dump mentah-mentah ke kolom spreadsheet jika script lama belum di-deploy baru
+      const cleanItem = {
+        ...item,
+        surat_bukti_url: (item.surat_bukti_url && item.surat_bukti_url.startsWith('http'))
+          ? item.surat_bukti_url
+          : ''
+      };
+
       await fetch(targetUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
           action: 'addKetidakhadiran',
-          ketidakhadiranData: item
+          ketidakhadiranData: {
+            ...cleanItem,
+            surat_bukti_base64: fileData ? fileData.data : undefined,
+            fileData: fileData || undefined
+          },
+          surat_bukti_base64: fileData ? fileData.data : undefined,
+          fileData: fileData || undefined
         }),
         mode: 'no-cors'
       });

@@ -522,9 +522,6 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                 <Share2 className="w-3.5 h-3.5 text-fuchsia-300" />
                 <span>Publikasi Media & Eflyer</span>
               </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-slate-200 text-xs font-mono">
-                Sheet: Form Responses 1
-              </span>
             </div>
 
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white">

@@ -110,30 +110,45 @@ class FlexibleDatabaseService {
                 : parsed.config.vice_headmaster_title,
               school_logo_url: parsed.config.school_logo_url || 'https://lh3.googleusercontent.com/d/1mnkKRHv-bqHsof1Lz4qdJd-o',
               logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
-              penilaian_spreadsheet_id: parsed.config.penilaian_spreadsheet_id || '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY',
-              penilaian_apps_script_url: parsed.config.penilaian_apps_script_url || 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec'
+              penilaian_spreadsheet_id: (!parsed.config.penilaian_spreadsheet_id || parsed.config.penilaian_spreadsheet_id === '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY')
+                ? '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU'
+                : parsed.config.penilaian_spreadsheet_id,
+              penilaian_apps_script_url: (!parsed.config.penilaian_apps_script_url || parsed.config.penilaian_apps_script_url.includes('AKfycbwNy8Gnl') || parsed.config.penilaian_apps_script_url.includes('AKfycbz2QHXUWcpxbsINs'))
+                ? 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec'
+                : parsed.config.penilaian_apps_script_url
             };
 
-          if (!parsed.config.penilaian_apps_script_url) {
-            parsed.config.penilaian_apps_script_url = 'https://script.google.com/macros/s/AKfycbwNy8GnlH6ly3hBKXXpOkmKhDBeCxS4_GHmMPnkDuYkV1Fg6Zh0aM7lSyDXaXs-hvrSng/exec';
+          if (!parsed.config.penilaian_spreadsheet_id || parsed.config.penilaian_spreadsheet_id === '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY') {
+            parsed.config.penilaian_spreadsheet_id = '1qVFbc3xC7jpQtZYmR-pfBQGuSa-OSxYZgfbYT-hToXU';
             needsResave = true;
           }
 
-          if (!Array.isArray(parsed.ketidakhadiranList) || parsed.ketidakhadiranList.length === 0) {
-            parsed.ketidakhadiranList = JSON.parse(JSON.stringify(initialDatabase.ketidakhadiranList || []));
+          if (!parsed.config.penilaian_apps_script_url || parsed.config.penilaian_apps_script_url.includes('AKfycbwNy8Gnl') || parsed.config.penilaian_apps_script_url.includes('AKfycbz2QHXUWcpxbsINs')) {
+            parsed.config.penilaian_apps_script_url = 'https://script.google.com/macros/s/AKfycby-gw1SGTIsKc1JWSK5AaHeARqn2TBxcL25SOeJt8VpOUVGCwlXFphxpmbnGm9e8Ts/exec';
+            needsResave = true;
+          }
+
+          if (!Array.isArray(parsed.ketidakhadiranList)) {
+            parsed.ketidakhadiranList = [];
             needsResave = true;
           } else {
-            // Ensure sample pending item KTH-005 is available if no pending item is present
-            const hasPending = parsed.ketidakhadiranList.some((k: any) =>
-              k.status === 'Menunggu' || k.status === 'Menunggu Verifikasi' || k.id === 'KTH-005'
+            // Bersihkan data dummy/mock bawaan template jika spreadsheet telah dibersihkan
+            const hasLegacyMock = parsed.ketidakhadiranList.some((k: any) =>
+              k && (k.id === 'KTH-001' || k.id === 'KTH-002' || k.id === 'KTH-003' || k.id === 'KTH-004' || k.id === 'KTH-005')
             );
-            if (!hasPending) {
-              const pendingItem = initialDatabase.ketidakhadiranList.find((k) => k.id === 'KTH-005');
-              if (pendingItem) {
-                parsed.ketidakhadiranList.push(JSON.parse(JSON.stringify(pendingItem)));
+            if (hasLegacyMock) {
+              parsed.ketidakhadiranList = parsed.ketidakhadiranList.filter((k: any) =>
+                k && !['KTH-001', 'KTH-002', 'KTH-003', 'KTH-004', 'KTH-005'].includes(k.id)
+              );
+              needsResave = true;
+            }
+            // Bersihkan string base64 raksasa jika ada baris yang sempat menyimpan base64 di cell
+            parsed.ketidakhadiranList.forEach((k: any) => {
+              if (k && typeof k.surat_bukti_url === 'string' && k.surat_bukti_url.startsWith('data:image')) {
+                k.surat_bukti_url = '';
                 needsResave = true;
               }
-            }
+            });
           }
 
           if (needsResave) {
