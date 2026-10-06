@@ -399,7 +399,7 @@ function getKetidakhadiranSheet(ss) {
   var headers = [
     "ID", "NIP", "Nama Guru", "Mapel", "Tanggal Mulai", "Tanggal Selesai",
     "Jenis", "Keterangan", "Inval Guru", "Kelas", "Bukti Surat",
-    "Status", "Catatan Admin", "Created At"
+    "Status", "Catatan Admin", "Created At", "Ada Surat"
   ];
   return getOrCreateSheet(ss, "Ketidakhadiran", headers, "#BE123C");
 }
@@ -822,7 +822,8 @@ function doPost(e) {
         suratBuktiUrl,
         kData.status || "Disetujui",
         kData.catatan_admin || "",
-        kData.created_at || timestamp
+        kData.created_at || timestamp,
+        kData.ada_surat || (suratBuktiUrl ? "Ada Surat" : "Tidak Ada")
       ]);
       return ContentService.createTextOutput(JSON.stringify({
         success: true,
@@ -838,11 +839,19 @@ function doPost(e) {
       var rows = sheetKet.getDataRange().getValues();
       for (var r = 1; r < rows.length; r++) {
         if (String(rows[r][0]).trim() === String(kData.id).trim() || (kData.rowIndex && kData.rowIndex === r + 1)) {
+          if (kData.tanggal_awal) sheetKet.getRange(r + 1, 5).setValue(kData.tanggal_awal);
+          if (kData.tanggal_akhir) sheetKet.getRange(r + 1, 6).setValue(kData.tanggal_akhir);
+          if (kData.jenis) sheetKet.getRange(r + 1, 7).setValue(kData.jenis);
+          if (kData.keterangan) sheetKet.getRange(r + 1, 8).setValue(kData.keterangan);
+          if (kData.inval_guru !== undefined) sheetKet.getRange(r + 1, 9).setValue(kData.inval_guru);
+          if (kData.kelas_terdampak !== undefined) sheetKet.getRange(r + 1, 10).setValue(kData.kelas_terdampak);
+          if (kData.surat_bukti_url !== undefined) sheetKet.getRange(r + 1, 11).setValue(kData.surat_bukti_url);
           if (kData.status) sheetKet.getRange(r + 1, 12).setValue(kData.status);
-          if (kData.catatan_admin) sheetKet.getRange(r + 1, 13).setValue(kData.catatan_admin);
+          if (kData.catatan_admin !== undefined) sheetKet.getRange(r + 1, 13).setValue(kData.catatan_admin);
+          if (kData.ada_surat !== undefined) sheetKet.getRange(r + 1, 15).setValue(kData.ada_surat);
           return ContentService.createTextOutput(JSON.stringify({
             success: true,
-            message: "Status ketidakhadiran berhasil diperbarui!"
+            message: "Status dan data ketidakhadiran berhasil diperbarui!"
           })).setMimeType(ContentService.MimeType.JSON);
         }
       }
@@ -1113,7 +1122,8 @@ function doGet(e) {
         surat_bukti_url: String(rK[10] || ""),
         status: String(rK[11] || "Disetujui"),
         catatan_admin: String(rK[12] || ""),
-        created_at: String(rK[13] || "")
+        created_at: String(rK[13] || ""),
+        ada_surat: String(rK[14] || (rK[10] ? "Ada Surat" : "Tidak Ada"))
       });
     }
 
@@ -1174,23 +1184,29 @@ class PenilaianService {
     const nip = (user.nip || '').trim();
     const role = (user.role || '').toLowerCase().trim();
 
-    if (role === 'kepala_sekolah' || role === 'kepala sekolah' || role.includes('kepala')) return true;
-
-    // Check config headmaster nip or nik
-    if (config?.headmaster_nip && nip === config.headmaster_nip.trim()) return true;
-    if (config?.headmaster_nik && nip === config.headmaster_nik.trim()) return true;
-
-    // Check config headmaster name
-    if (config?.headmaster) {
-      const headName = config.headmaster.toLowerCase().trim();
-      const cleanHead = headName.replace(/,\s*[a-z\.\s]+$/i, '').trim();
-      if ((cleanHead.length > 2 && name.includes(cleanHead)) || headName.includes(name)) return true;
+    // Nilam Cahya is Wakil Kepala Sekolah / Tim Kurikulum (Tendik), NOT Kepala Sekolah
+    if (name.includes('nilam') || nip === '03.18.10.49' || nip === '02.20.09.112') {
+      return false;
     }
 
-    // Default SMPIT Pondok Duta Headmaster
-    if (name.includes('abu haripin') || nip === '03.18.10.49' || nip === '03.13.01.13') return true;
+    // Bot admin account is not headmaster
+    if (nip.toLowerCase() === 'admin' || name.includes('administrator sekolah')) {
+      return false;
+    }
 
-    if (role === 'administrator') return true;
+    // Abu Haripin, M.Pd is the SOLE Kepala Sekolah of SMPIT Pondok Duta
+    if (name.includes('abu haripin') || nip === '03.13.01.13') {
+      return true;
+    }
+
+    if (role === 'kepala_sekolah' || role === 'kepala sekolah' || role === 'kepsek' || role === 'headmaster') {
+      return true;
+    }
+
+    // Check config headmaster nip or nik (strictly not Nilam's NIP)
+    if (config?.headmaster_nip && nip === config.headmaster_nip.trim() && nip !== '03.18.10.49') return true;
+    if (config?.headmaster_nik && nip === config.headmaster_nik.trim() && nip !== '03.18.10.49') return true;
+
     return false;
   }
 

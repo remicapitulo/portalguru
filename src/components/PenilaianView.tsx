@@ -214,9 +214,6 @@ export const PenilaianView: React.FC<PenilaianViewProps> = ({
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-slate-300">
                 Tahun Ajaran {academicYear}
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-500/20 text-purple-200 border border-purple-400/30">
-                Periode 1 Tahun Kalender Penuh
-              </span>
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
               <span>Penilaian Kinerja</span>

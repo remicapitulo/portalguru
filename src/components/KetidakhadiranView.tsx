@@ -32,7 +32,12 @@ import {
   Upload,
   FileUp,
   X,
-  FolderOpen
+  FolderOpen,
+  Edit,
+  Pencil,
+  FileCheck,
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -79,6 +84,29 @@ const STATUS_BADGES: Record<StatusKetidakhadiran, { bg: string; text: string }> 
   Ditolak: { bg: 'bg-rose-100 text-rose-800 border-rose-300', text: 'Tidak Disetujui' }
 };
 
+// Helper ekstraksi format bulan YYYY-MM dari berbagai format tanggal
+const getMonthYearKey = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  // YYYY-MM-DD atau YYYY/MM/DD
+  if (/^\d{4}[-/]\d{2}/.test(trimmed)) {
+    return trimmed.substring(0, 7).replace('/', '-');
+  }
+  // DD-MM-YYYY atau DD/MM/YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const [, , m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}`;
+  }
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+  return '';
+};
+
 export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
   currentUser,
   config,
@@ -86,9 +114,8 @@ export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
   ketidakhadiranList
 }) => {
   const isTeacher = currentUser?.role?.toLowerCase() === 'guru';
-  const isAdmin = Boolean(
+  const isAdminOrKepsek = Boolean(
     currentUser &&
-      !isTeacher &&
       (currentUser.role?.toLowerCase() === 'admin' ||
         currentUser.role?.toLowerCase() === 'administrator' ||
         currentUser.role?.toLowerCase() === 'kepala_sekolah' ||
@@ -96,6 +123,24 @@ export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
         (config.headmaster_nip && currentUser.nip === config.headmaster_nip) ||
         (config.headmaster && currentUser.nama?.toLowerCase().includes(config.headmaster.toLowerCase().trim())))
   );
+
+  // Akses penuh untuk Tata Usaha (TU / Staf TU / Tendik / Administrasi)
+  const isTataUsaha = Boolean(
+    currentUser &&
+      (currentUser.role?.toLowerCase().includes('tata usaha') ||
+        currentUser.role?.toLowerCase() === 'tu' ||
+        currentUser.role?.toLowerCase() === 'staff tu' ||
+        currentUser.role?.toLowerCase() === 'staf tu' ||
+        currentUser.role?.toLowerCase() === 'tendik' ||
+        currentUser.mapel?.toLowerCase().includes('tata usaha') ||
+        currentUser.mapel?.toLowerCase() === 'tu' ||
+        currentUser.role?.toLowerCase().includes('administrasi') ||
+        currentUser.mapel?.toLowerCase().includes('administrasi'))
+  );
+
+  // Akses penuh mencakup Administrator, Kepala Sekolah, dan Tata Usaha
+  const hasFullAccess = Boolean(isAdminOrKepsek || isTataUsaha);
+  const isAdmin = hasFullAccess;
 
   const activeGasUrl = config.penilaian_apps_script_url || DEFAULT_PENILAIAN_APPS_SCRIPT_URL;
   const penilaianSpreadsheetId = config.penilaian_spreadsheet_id || PENILAIAN_SPREADSHEET_ID;
@@ -118,30 +163,94 @@ export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
   };
 
   // Cek hak akses hapus ajuan:
-  // - Admin / Kepala Sekolah: Berhak menghapus ajuan/catatan
+  // - Admin / Kepala Sekolah / Tata Usaha: Berhak menghapus ajuan/catatan
   // - Guru pemilik akun: Berhak menghapus ajuan miliknya HANYA jika status masih 'Menunggu Verifikasi'
-  // - Sesama guru lain: TIDAK berhak menghapus ajuan rekan sejawat
   const canDeleteAjuan = (item: KetidakhadiranItem): boolean => {
     if (!currentUser) return false;
-    if (isAdmin) return true;
+    if (hasFullAccess) return true;
     const isWaiting = item.status === 'Menunggu' || item.status === 'Menunggu Verifikasi' || item.status?.toLowerCase().includes('menunggu');
     return isWaiting && isItemOwner(item);
   };
+
+  // Cek hak akses edit ajuan:
+  // - Admin / Kepala Sekolah / Tata Usaha: Akses penuh mengedit tanggal, status, bukti, dan data yayasan
+  // - Guru pemilik akun: Dapat mengedit selama masih 'Menunggu Verifikasi'
+  const canEditAjuan = (item: KetidakhadiranItem): boolean => {
+    if (!currentUser) return false;
+    if (hasFullAccess) return true;
+    const isWaiting = item.status === 'Menunggu' || item.status === 'Menunggu Verifikasi' || item.status?.toLowerCase().includes('menunggu');
+    return isWaiting && isItemOwner(item);
+  };
+
+  const NAMA_BULAN = useMemo(() => [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ], []);
+
+  // Otomatis tentukan bulan dan tahun berjalan (YYYY-MM)
+  const currentYearMonth = useMemo(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }, []);
+
+  // Tampilan awal otomatis mengikuti bulan dan tahun berjalan
+  const [filterBulan, setFilterBulan] = useState<string>(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  });
 
   const [activeTab, setActiveTab] = useState<SubTab>('daftar');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterJenis, setFilterJenis] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterBulan, setFilterBulan] = useState<string>('all');
   const [syncing, setSyncing] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Route-guard: Tutup sub-menu Realisasi di Spreadsheet dari akun Guru (hanya Admin yang dapat membuka)
+  // Daftar opsi bulan terstruktur untuk filter (Januari s.d Desember & data yang tersedia)
+  const availableMonths = useMemo(() => {
+    const monthMap = new Map<string, string>();
+    const now = new Date();
+    const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const curMonthName = NAMA_BULAN[now.getMonth()];
+    monthMap.set(curYM, `${curMonthName} ${now.getFullYear()} (Bulan Berjalan)`);
+
+    // Tambahkan 12 bulan (Januari s.d Desember)
+    const currentYear = now.getFullYear();
+    for (let m = 1; m <= 12; m++) {
+      const ym = `${currentYear}-${String(m).padStart(2, '0')}`;
+      if (!monthMap.has(ym)) {
+        monthMap.set(ym, `${NAMA_BULAN[m - 1]} ${currentYear}`);
+      }
+    }
+
+    // Tambahkan dari data tanggal_awal yang tercatat di database
+    ketidakhadiranList.forEach((item) => {
+      const ym = getMonthYearKey(item.tanggal_awal);
+      if (ym && !monthMap.has(ym)) {
+        const [y, mStr] = ym.split('-');
+        const mIdx = parseInt(mStr, 10) - 1;
+        monthMap.set(ym, `${NAMA_BULAN[mIdx] || mStr} ${y}`);
+      }
+    });
+
+    const sortedKeys = Array.from(monthMap.keys()).sort().reverse();
+    return sortedKeys.map((key) => ({
+      value: key,
+      label: monthMap.get(key) || key,
+      isCurrent: key === curYM
+    }));
+  }, [NAMA_BULAN, ketidakhadiranList]);
+
+  // Route-guard: Tutup sub-menu Realisasi di Spreadsheet dari akun Guru (hanya Admin/TU yang dapat membuka)
   useEffect(() => {
-    if (!isAdmin && activeTab === 'spreadsheet') {
+    if (!hasFullAccess && activeTab === 'spreadsheet') {
       setActiveTab('daftar');
     }
-  }, [isAdmin, activeTab]);
+  }, [hasFullAccess, activeTab]);
 
   // Form State
   const [formNip, setFormNip] = useState<string>(currentUser ? currentUser.nip : (allTeachers[0]?.nip || ''));
@@ -153,11 +262,35 @@ export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
   const [formKelas, setFormKelas] = useState<string>('');
   const [formBukti, setFormBukti] = useState<string>('');
   const [formFile, setFormFile] = useState<File | null>(null);
+  const [formAdaSurat, setFormAdaSurat] = useState<'Ada Surat' | 'Tidak Ada'>('Tidak Ada');
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<KetidakhadiranItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Status Modal State (Ubah Status & Kelengkapan Surat oleh TU / Admin / Kepsek)
+  const [statusModalItem, setStatusModalItem] = useState<KetidakhadiranItem | null>(null);
+  const [statusModalStatus, setStatusModalStatus] = useState<StatusKetidakhadiran>('Disetujui');
+  const [statusModalAdaSurat, setStatusModalAdaSurat] = useState<'Ada Surat' | 'Tidak Ada'>('Tidak Ada');
+  const [statusModalCatatan, setStatusModalCatatan] = useState<string>('');
+
+  // Edit Modal State (Aksi Editing Data Ketidakhadiran - sinkronisasi tanggal & data yayasan)
+  const [editingItem, setEditingItem] = useState<KetidakhadiranItem | null>(null);
+  const [editNip, setEditNip] = useState<string>('');
+  const [editTanggalAwal, setEditTanggalAwal] = useState<string>('');
+  const [editTanggalAkhir, setEditTanggalAkhir] = useState<string>('');
+  const [editJenis, setEditJenis] = useState<JenisKetidakhadiran>('Izin');
+  const [editKeterangan, setEditKeterangan] = useState<string>('');
+  const [editInval, setEditInval] = useState<string>('');
+  const [editKelas, setEditKelas] = useState<string>('');
+  const [editAdaSurat, setEditAdaSurat] = useState<'Ada Surat' | 'Tidak Ada'>('Tidak Ada');
+  const [editStatus, setEditStatus] = useState<StatusKetidakhadiran>('Disetujui');
+  const [editCatatanAdmin, setEditCatatanAdmin] = useState<string>('');
+  const [editBuktiUrl, setEditBuktiUrl] = useState<string>('');
+  const [editBuktiName, setEditBuktiName] = useState<string>('');
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
 
   // Spreadsheet Guide States & Helpers
   const [copiedHeader, setCopiedHeader] = useState(false);
@@ -425,26 +558,36 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
         }
       }
 
-      // Filter Bulan
+      // Filter Bulan (Otomatis bulan berjalan & dapat difilter perbulan)
       if (filterBulan !== 'all' && item.tanggal_awal) {
-        const itemMonth = item.tanggal_awal.substring(0, 7); // YYYY-MM
-        if (itemMonth !== filterBulan) return false;
+        const itemMonth = getMonthYearKey(item.tanggal_awal);
+        if (itemMonth && itemMonth !== filterBulan) return false;
       }
 
       return true;
     });
   }, [ketidakhadiranList, searchQuery, filterJenis, filterStatus, filterBulan]);
 
-  // KPI Statistics
+  // Items khusus bulan terpilih (atau seluruh dataset jika filterBulan === 'all')
+  const monthlyItems = useMemo(() => {
+    if (filterBulan === 'all') return ketidakhadiranList;
+    return ketidakhadiranList.filter((item) => {
+      const ym = getMonthYearKey(item.tanggal_awal);
+      return ym === filterBulan;
+    });
+  }, [ketidakhadiranList, filterBulan]);
+
+  // KPI Statistics (mengikuti periode bulan yang sedang aktif)
   const stats = useMemo(() => {
-    const total = ketidakhadiranList.length;
-    const sakit = ketidakhadiranList.filter((i) => i.jenis === 'Sakit').length;
-    const izin = ketidakhadiranList.filter((i) => i.jenis === 'Izin').length;
-    const dinas = ketidakhadiranList.filter((i) => i.jenis === 'Dinas Luar').length;
-    const cuti = ketidakhadiranList.filter((i) => i.jenis === 'Cuti').length;
+    const targetList = filterBulan === 'all' ? ketidakhadiranList : monthlyItems;
+    const total = targetList.length;
+    const sakit = targetList.filter((i) => i.jenis === 'Sakit').length;
+    const izin = targetList.filter((i) => i.jenis === 'Izin').length;
+    const dinas = targetList.filter((i) => i.jenis === 'Dinas Luar').length;
+    const cuti = targetList.filter((i) => i.jenis === 'Cuti').length;
     const waiting = ketidakhadiranList.filter((i) => i.status === 'Menunggu' || i.status === 'Menunggu Verifikasi' || i.status?.toLowerCase().includes('menunggu')).length;
     return { total, sakit, izin, dinas, cuti, waiting };
-  }, [ketidakhadiranList]);
+  }, [ketidakhadiranList, monthlyItems, filterBulan]);
 
   const waitingCount = stats.waiting;
 
@@ -534,8 +677,9 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
         kelas_terdampak: formKelas.trim(),
         surat_bukti_url: finalBuktiUrl || undefined,
         surat_bukti_name: finalBuktiName || undefined,
+        ada_surat: finalBuktiUrl || formAdaSurat === 'Ada Surat' ? 'Ada Surat' : 'Tidak Ada',
         status: isAdmin ? 'Disetujui' : 'Menunggu',
-        catatan_admin: isAdmin ? 'Dicatatkan langsung oleh Administrator/Pimpinan' : ''
+        catatan_admin: isAdmin ? 'Dicatatkan langsung oleh Administrator / Tata Usaha / Pimpinan' : ''
       };
 
       // 1. Simpan ke database lokal
@@ -559,7 +703,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
       setFeedback({
         type: 'success',
-        message: `✓ Laporan ketidakhadiran untuk ${selectedTeacher.nama} berhasil dicatat & otomatis disinkronkan dari Google Spreadsheet!`
+        message: `✓ Laporan ketidakhadiran untuk ${selectedTeacher.nama} berhasil dicatat & otomatis disinkronkan ke Google Spreadsheet!`
       });
 
       // Reset Form
@@ -568,6 +712,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
       setFormKelas('');
       setFormBukti('');
       setFormFile(null);
+      setFormAdaSurat('Tidak Ada');
       if (fileInputRef.current) fileInputRef.current.value = '';
       setActiveTab('daftar');
     } catch (err: any) {
@@ -616,7 +761,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     if (!canDeleteAjuan(item)) {
       setFeedback({
         type: 'error',
-        message: 'Akses Ditolak: Hanya akun guru pemohon ajuan tersebut atau Admin/Kepala Sekolah yang berhak menghapus ajuan ini.'
+        message: 'Akses Ditolak: Hanya akun guru pemohon ajuan tersebut atau Admin/Kepala Sekolah/Tata Usaha yang berhak menghapus ajuan ini.'
       });
       return;
     }
@@ -648,14 +793,119 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     });
   };
 
-  // Update Status Action (Admin Only)
-  const handleUpdateStatus = (item: KetidakhadiranItem, newStatus: StatusKetidakhadiran) => {
-    dbService.updateKetidakhadiran(item.id, { status: newStatus });
-    penilaianService.updateKetidakhadiranInSpreadsheet({ ...item, status: newStatus }, activeGasUrl).catch(() => {});
-    setFeedback({ type: 'success', message: `Status ketidakhadiran ${item.nama} diperbarui menjadi: ${newStatus}` });
+  // Buka Modal Ubah Status & Kelengkapan Surat (Diisi oleh Tata Usaha / Admin / Kepala Sekolah)
+  const handleOpenStatusModal = (item: KetidakhadiranItem, targetStatus?: StatusKetidakhadiran) => {
+    setStatusModalItem(item);
+    setStatusModalStatus(targetStatus || item.status);
+    const initialAda = (item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat))
+      ? 'Ada Surat'
+      : 'Tidak Ada';
+    setStatusModalAdaSurat(initialAda);
+    setStatusModalCatatan(item.catatan_admin || '');
   };
 
-  // Export PDF Report
+  // Simpan Perubahan Status & Kelengkapan Surat
+  const handleSaveStatusModal = () => {
+    if (!statusModalItem) return;
+    const target = statusModalItem;
+    const updatedFields: Partial<KetidakhadiranItem> = {
+      status: statusModalStatus,
+      ada_surat: statusModalAdaSurat,
+      catatan_admin: statusModalCatatan.trim()
+    };
+    dbService.updateKetidakhadiran(target.id, updatedFields);
+    penilaianService.updateKetidakhadiranInSpreadsheet({ ...target, ...updatedFields }, activeGasUrl).catch(() => {});
+    setStatusModalItem(null);
+    setFeedback({
+      type: 'success',
+      message: `✓ Status ${target.nama} diperbarui menjadi: "${statusModalStatus}" dengan kelengkapan berkas: "${statusModalAdaSurat}".`
+    });
+  };
+
+  // Buka Modal Edit Data Ketidakhadiran (Perbedaan tanggal atau ketidaksamaan data dengan yayasan)
+  const handleOpenEditModal = (item: KetidakhadiranItem) => {
+    setEditingItem(item);
+    setEditNip(item.nip);
+    setEditTanggalAwal(item.tanggal_awal);
+    setEditTanggalAkhir(item.tanggal_akhir || item.tanggal_awal);
+    setEditJenis(item.jenis);
+    setEditKeterangan(item.keterangan || '');
+    setEditInval(item.inval_guru || '');
+    setEditKelas(item.kelas_terdampak || '');
+    const initialAda = (item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat))
+      ? 'Ada Surat'
+      : 'Tidak Ada';
+    setEditAdaSurat(initialAda);
+    setEditStatus(item.status);
+    setEditCatatanAdmin(item.catatan_admin || '');
+    setEditBuktiUrl(item.surat_bukti_url || '');
+    setEditBuktiName(item.surat_bukti_name || '');
+    setEditFile(null);
+  };
+
+  // Simpan Perubahan Edit Data Ketidakhadiran
+  const handleSaveEditModal = async () => {
+    if (!editingItem) return;
+    setIsSavingEdit(true);
+    try {
+      let finalBuktiUrl = editBuktiUrl;
+      let finalBuktiName = editBuktiName;
+
+      if (editFile) {
+        try {
+          const base64Data = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(editFile);
+          });
+          finalBuktiUrl = base64Data;
+          finalBuktiName = editFile.name;
+        } catch (e) {
+          console.warn('Gagal membaca berkas edit:', e);
+        }
+      }
+
+      const selectedT = allTeachers.find((t) => t.nip === editNip);
+      const targetNama = selectedT ? selectedT.nama : editingItem.nama;
+      const targetMapel = selectedT ? (selectedT.mapel || 'Guru') : editingItem.mapel;
+
+      const updatedData: Partial<KetidakhadiranItem> = {
+        nip: editNip,
+        nama: targetNama,
+        mapel: targetMapel,
+        tanggal_awal: editTanggalAwal,
+        tanggal_akhir: editTanggalAkhir || editTanggalAwal,
+        jenis: editJenis,
+        keterangan: editKeterangan.trim(),
+        inval_guru: editInval.trim(),
+        kelas_terdampak: editKelas.trim(),
+        ada_surat: editAdaSurat,
+        status: editStatus,
+        catatan_admin: editCatatanAdmin.trim(),
+        surat_bukti_url: finalBuktiUrl || undefined,
+        surat_bukti_name: finalBuktiName || undefined
+      };
+
+      dbService.updateKetidakhadiran(editingItem.id, updatedData);
+      penilaianService.updateKetidakhadiranInSpreadsheet({ ...editingItem, ...updatedData }, activeGasUrl).catch(() => {});
+
+      setEditingItem(null);
+      setFeedback({
+        type: 'success',
+        message: `✓ Data ketidakhadiran ${targetNama} berhasil diperbarui (tanggal & status disinkronkan ke yayasan)!`
+      });
+    } catch (err: any) {
+      setFeedback({
+        type: 'error',
+        message: 'Gagal memperbarui data: ' + (err.message || String(err))
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // Export PDF Report (Dengan Kolom "Ada Surat / Tidak")
   const handleExportPDF = () => {
     const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -697,6 +947,9 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
       item.nama,
       item.mapel || '-',
       item.jenis,
+      item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat)
+        ? 'Ada Surat'
+        : 'Tidak Ada',
       item.keterangan || '-',
       item.inval_guru || '-',
       item.status
@@ -704,20 +957,21 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
     autoTable(doc, {
       startY: 47,
-      head: [['No', 'Tanggal', 'Nama Guru / Tendik', 'Mapel', 'Jenis', 'Keterangan / Alasan', 'Guru Pengganti (Inval)', 'Status']],
+      head: [['No', 'Tanggal', 'Nama Guru / Tendik', 'Mapel', 'Jenis', 'Ada Surat', 'Keterangan / Alasan', 'Guru Pengganti (Inval)', 'Status']],
       body: rows,
       theme: 'grid',
       styles: { fontSize: 8.5, cellPadding: 2.5 },
       headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: 'bold', halign: 'center' },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        1: { halign: 'center', cellWidth: 32 },
-        2: { cellWidth: 48 },
-        3: { cellWidth: 30 },
-        4: { halign: 'center', cellWidth: 22 },
-        5: { cellWidth: 65 },
-        6: { cellWidth: 35 },
-        7: { halign: 'center', cellWidth: 25 }
+        1: { halign: 'center', cellWidth: 30 },
+        2: { cellWidth: 44 },
+        3: { cellWidth: 26 },
+        4: { halign: 'center', cellWidth: 20 },
+        5: { halign: 'center', cellWidth: 22 },
+        6: { cellWidth: 55 },
+        7: { cellWidth: 33 },
+        8: { halign: 'center', cellWidth: 24 }
       }
     });
 
@@ -929,10 +1183,29 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* FILTER BULAN (Otomatis Bulan Berjalan & Bebas Filter Perbulan) */}
+              <div className="relative">
+                <select
+                  value={filterBulan}
+                  onChange={(e) => setFilterBulan(e.target.value)}
+                  className="pl-8 pr-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white focus:border-rose-500 outline-none cursor-pointer shadow-2xs hover:border-slate-300 transition"
+                  title="Filter perbulan atau tampilkan 1 tahun penuh"
+                >
+                  <option value="all">📅 Semua Bulan (1 Tahun Penuh)</option>
+                  {availableMonths.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.isCurrent ? `📌 ${m.label}` : m.label}
+                    </option>
+                  ))}
+                </select>
+                <Calendar className="w-3.5 h-3.5 text-rose-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* FILTER JENIS */}
               <select
                 value={filterJenis}
                 onChange={(e) => setFilterJenis(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:border-rose-500 outline-none cursor-pointer"
+                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:border-rose-500 outline-none cursor-pointer shadow-2xs hover:border-slate-300 transition"
               >
                 <option value="all">Semua Jenis Ketidakhadiran</option>
                 <option value="Sakit">Sakit</option>
@@ -942,10 +1215,11 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                 <option value="Lainnya">Lainnya</option>
               </select>
 
+              {/* FILTER STATUS */}
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:border-rose-500 outline-none cursor-pointer"
+                className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white focus:border-rose-500 outline-none cursor-pointer shadow-2xs hover:border-slate-300 transition"
               >
                 <option value="all">Semua Status</option>
                 <option value="Menunggu">⏳ Menunggu Verifikasi {waitingCount > 0 ? `(${waitingCount})` : ''}</option>
@@ -953,8 +1227,46 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                 <option value="Diverifikasi">✓ Terverifikasi</option>
                 <option value="Ditolak">✕ Tidak Disetujui</option>
               </select>
+
+              {/* RESET FILTER */}
+              {(filterBulan !== 'all' || filterJenis !== 'all' || filterStatus !== 'all' || searchQuery.trim() !== '') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterBulan('all');
+                    setFilterJenis('all');
+                    setFilterStatus('all');
+                    setSearchQuery('');
+                  }}
+                  className="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Reset semua filter"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">Reset Filter</span>
+                </button>
+              )}
             </div>
           </div>
+
+          {/* ACTIVE FILTER BADGE / INFO */}
+          {filterBulan !== 'all' && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-2.5 bg-rose-50/80 border border-rose-200/90 rounded-2xl text-xs text-rose-950 gap-2 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>
+                  Filter Periode Aktif: <strong>{availableMonths.find((m) => m.value === filterBulan)?.label || filterBulan}</strong>
+                  <span className="text-slate-500 text-[11px] ml-1.5">({displayList.length} catatan pada bulan ini)</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterBulan('all')}
+                className="self-start sm:self-auto px-2.5 py-1 rounded-lg bg-rose-200/70 hover:bg-rose-300 text-rose-950 text-[11px] font-bold transition cursor-pointer"
+              >
+                Tampilkan Semua Bulan (1 Tahun Penuh)
+              </button>
+            </div>
+          )}
 
           {/* BANNER AJUAN MENUNGGU VERIFIKASI */}
           {waitingCount > 0 && (
@@ -980,10 +1292,10 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
             </div>
           )}
 
-          {/* TABLE CONTAINER */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {/* DESKTOP TABLE VIEW (Tampil pada layar md ke atas) */}
+          <div className="hidden md:block bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[760px]">
+              <table className="w-full text-left border-collapse min-w-[840px]">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase text-slate-600 tracking-wider">
                     <th className="py-3.5 px-4 w-12 text-center">No</th>
@@ -991,9 +1303,10 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                     <th className="py-3.5 px-4">Nama Guru / Tendik</th>
                     <th className="py-3.5 px-4 w-28 text-center">Jenis</th>
                     <th className="py-3.5 px-4">Keterangan / Alasan</th>
+                    <th className="py-3.5 px-4 w-32 text-center">Ada Surat?</th>
                     <th className="py-3.5 px-4 w-40">Guru Pengganti (Inval)</th>
                     <th className="py-3.5 px-4 w-32 text-center">Status</th>
-                    <th className="py-3.5 px-4 w-32 text-center sticky right-0 bg-slate-100/95 sm:bg-slate-100 z-10 border-l border-slate-200 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">
+                    <th className="py-3.5 px-4 w-36 text-center sticky right-0 bg-slate-100/95 sm:bg-slate-100 z-10 border-l border-slate-200 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">
                       Aksi
                     </th>
                   </tr>
@@ -1006,6 +1319,8 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       const isSingleDay = !item.tanggal_akhir || item.tanggal_awal === item.tanggal_akhir;
                       const isWaiting = item.status === 'Menunggu' || item.status === 'Menunggu Verifikasi' || item.status?.toLowerCase().includes('menunggu');
                       const canDelete = canDeleteAjuan(item);
+                      const canEdit = canEditAjuan(item);
+                      const hasSurat = item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat);
 
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
@@ -1055,6 +1370,46 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                               )}
                             </div>
                           </td>
+                          {/* KOLOM ADA SURAT / TIDAK */}
+                          <td className="py-3.5 px-4 text-center">
+                            {hasSurat ? (
+                              <div className="inline-flex flex-col items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => hasFullAccess ? handleOpenStatusModal(item) : undefined}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 transition ${
+                                    hasFullAccess ? 'hover:bg-emerald-200 cursor-pointer shadow-2xs' : ''
+                                  }`}
+                                  title={hasFullAccess ? "Klik untuk ubah status & kelengkapan surat" : "Surat / Bukti Resmi Tersedia"}
+                                >
+                                  <FileCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>Ada Surat</span>
+                                </button>
+                                {item.surat_bukti_url && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
+                                    className="inline-flex items-center gap-1 text-[10px] text-purple-700 hover:text-purple-900 font-semibold underline cursor-pointer"
+                                    title="Buka Berkas Bukti"
+                                  >
+                                    <span>Berkas</span>
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => hasFullAccess ? handleOpenStatusModal(item) : undefined}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-slate-100 text-slate-500 border border-slate-200 transition ${
+                                  hasFullAccess ? 'hover:bg-slate-200 hover:text-slate-800 cursor-pointer shadow-2xs' : ''
+                                }`}
+                                title={hasFullAccess ? "Klik untuk isi kelengkapan surat & ubah status" : "Belum Ada Berkas Surat"}
+                              >
+                                <span>Tidak Ada</span>
+                              </button>
+                            )}
+                          </td>
                           <td className="py-3.5 px-4">
                             {item.inval_guru ? (
                               <span className="font-semibold text-slate-800 flex items-center gap-1">
@@ -1066,17 +1421,16 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            {isAdmin ? (
-                              <select
-                                value={item.status}
-                                onChange={(e) => handleUpdateStatus(item, e.target.value as StatusKetidakhadiran)}
-                                className={`px-2 py-1 rounded-lg text-[10.5px] font-bold border outline-none cursor-pointer ${statusInfo.bg}`}
+                            {hasFullAccess ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenStatusModal(item)}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10.5px] font-bold border transition hover:opacity-90 shadow-2xs cursor-pointer ${statusInfo.bg}`}
+                                title="Klik untuk verifikasi status dan kelengkapan surat"
                               >
-                                <option value="Disetujui">Disetujui</option>
-                                <option value="Diverifikasi">Diverifikasi</option>
-                                <option value="Menunggu">Menunggu</option>
-                                <option value="Ditolak">Ditolak</option>
-                              </select>
+                                <span>{item.status}</span>
+                                <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+                              </button>
                             ) : (
                               <span className={`inline-block px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${statusInfo.bg}`}>
                                 {statusInfo.text}
@@ -1084,36 +1438,63 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center sticky right-0 bg-white/95 sm:bg-white z-10 border-l border-slate-100 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] group-hover:bg-slate-50/95">
-                            {canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteItem(item)}
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 shadow-xs hover:shadow transition-all cursor-pointer active:scale-95 group/btn"
-                                title={isWaiting ? "Batalkan ajuan ini yang masih Menunggu Verifikasi" : "Hapus catatan ketidakhadiran"}
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-white/90 group-hover/btn:scale-110 transition-transform" />
-                                <span>Delete</span>
-                              </button>
-                            ) : isWaiting ? (
-                              <span
-                                className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/60"
-                                title="Ajuan milik rekan guru lain (Hanya guru pemohon atau Kepala Sekolah/Admin yang berhak membatalkan)"
-                              >
-                                <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Terkunci</span>
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-slate-400 font-medium">Terkunci</span>
-                            )}
+                            <div className="flex items-center justify-center gap-1.5">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditModal(item)}
+                                  className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
+                                  title="Edit tanggal, jenis, surat, atau ketidaksamaan data dengan yayasan"
+                                >
+                                  <Edit className="w-3.5 h-3.5 text-white/90" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                              {canDelete ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteItem(item)}
+                                  className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 shadow-xs hover:shadow transition-all cursor-pointer active:scale-95 group/btn"
+                                  title={isWaiting ? "Batalkan ajuan ini yang masih Menunggu Verifikasi" : "Hapus catatan ketidakhadiran"}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-white/90 group-hover/btn:scale-110 transition-transform" />
+                                  <span>Delete</span>
+                                </button>
+                              ) : isWaiting && !canEdit ? (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/60"
+                                  title="Ajuan milik rekan guru lain (Hanya guru pemohon atau Kepala Sekolah/Tata Usaha/Admin yang berhak membatalkan)"
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>Terkunci</span>
+                                </span>
+                              ) : !canEdit ? (
+                                <span className="text-[11px] text-slate-400 font-medium">Terkunci</span>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
+                      <td colSpan={9} className="py-12 text-center text-slate-400 space-y-2">
                         <CalendarX className="w-8 h-8 text-slate-300 mx-auto" />
-                        <p className="text-xs font-semibold">Belum ada catatan ketidakhadiran yang cocok dengan pencarian.</p>
+                        <p className="text-xs font-semibold">
+                          {filterBulan !== 'all'
+                            ? `Belum ada catatan ketidakhadiran pada bulan ${availableMonths.find((m) => m.value === filterBulan)?.label || filterBulan}.`
+                            : 'Belum ada catatan ketidakhadiran yang cocok dengan pencarian.'}
+                        </p>
+                        {filterBulan !== 'all' && (
+                          <button
+                            type="button"
+                            onClick={() => setFilterBulan('all')}
+                            className="mt-2 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>Tampilkan Semua Bulan</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )}
@@ -1123,11 +1504,230 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
             {/* Table Footer Summary */}
             <div className="p-4 bg-slate-50 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 gap-2">
-              <span>Menampilkan {displayList.length} dari total {ketidakhadiranList.length} data ketidakhadiran</span>
+              <span>
+                Menampilkan {displayList.length} dari total {ketidakhadiranList.length} data ketidakhadiran{' '}
+                {filterBulan !== 'all' ? `(Periode: ${availableMonths.find((m) => m.value === filterBulan)?.label || filterBulan})` : '(Semua Bulan)'}
+              </span>
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                 <span>Tersinkronisasi otomatis dengan Google Spreadsheet SMPIT Pondok Duta</span>
               </div>
+            </div>
+          </div>
+
+          {/* MOBILE CARDS VIEW (Tampil khusus mobile, rapi, elegan tanpa perlu scroll horizontal) */}
+          <div className="block md:hidden space-y-3.5">
+            {displayList.length > 0 ? (
+              displayList.map((item, index) => {
+                const colorInfo = JENIS_COLORS[item.jenis] || JENIS_COLORS.Lainnya;
+                const statusInfo = STATUS_BADGES[item.status] || STATUS_BADGES.Menunggu;
+                const isSingleDay = !item.tanggal_akhir || item.tanggal_awal === item.tanggal_akhir;
+                const isWaiting = item.status === 'Menunggu' || item.status === 'Menunggu Verifikasi' || item.status?.toLowerCase().includes('menunggu');
+                const canDelete = canDeleteAjuan(item);
+                const canEdit = canEditAjuan(item);
+                const hasSurat = item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat);
+
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:border-slate-300 transition"
+                  >
+                    {/* Header Card: No, Jenis & Status */}
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 font-mono text-[10px] font-bold flex items-center justify-center">
+                          #{index + 1}
+                        </span>
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold border ${colorInfo.bg} ${colorInfo.text} ${colorInfo.border}`}
+                        >
+                          {item.jenis}
+                        </span>
+                      </div>
+
+                      {hasFullAccess ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(item)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10.5px] font-bold border transition hover:opacity-90 shadow-2xs cursor-pointer ${statusInfo.bg}`}
+                          title="Klik untuk ubah status & kelengkapan surat"
+                        >
+                          <span>{item.status}</span>
+                          <ChevronDown className="w-3 h-3 opacity-60 shrink-0" />
+                        </button>
+                      ) : (
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${statusInfo.bg}`}>
+                          {statusInfo.text}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Informasi Guru & Tanggal */}
+                    <div className="space-y-2">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-slate-900 leading-snug">{item.nama}</h4>
+                        <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                          NIP: {item.nip} {item.mapel ? `• ${item.mapel}` : ''}
+                        </p>
+                      </div>
+
+                      {/* Kotak Tanggal */}
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs text-slate-800 font-medium">
+                        <Calendar className="w-4 h-4 text-rose-500 shrink-0" />
+                        <span className="font-semibold">
+                          {isSingleDay ? (
+                            item.tanggal_awal
+                          ) : (
+                            <>
+                              {item.tanggal_awal} <span className="text-slate-400 font-normal">s.d</span> {item.tanggal_akhir}
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Alasan / Keterangan */}
+                      {item.keterangan && (
+                        <div className="text-xs text-slate-700 bg-slate-50/60 p-2.5 rounded-xl border border-slate-100">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Keterangan:</span>
+                          <p className="leading-relaxed">{item.keterangan}</p>
+                        </div>
+                      )}
+
+                      {/* Grid Detail: Ada Surat & Inval */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        {/* Kolom Kelengkapan Surat */}
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ada Surat?</span>
+                          {hasSurat ? (
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800">
+                                <FileCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Ada Surat</span>
+                              </span>
+                              {item.surat_bukti_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
+                                  className="p-1 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 text-[10px] transition cursor-pointer"
+                                  title="Buka Berkas Bukti"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-slate-500">Tidak Ada</span>
+                          )}
+                        </div>
+
+                        {/* Kolom Inval */}
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between gap-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Guru Inval</span>
+                          {item.inval_guru ? (
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800">
+                              <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{item.inval_guru}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">Tanpa Inval</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {item.kelas_terdampak && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-600 pt-0.5">
+                          <span className="font-semibold text-slate-400">Kelas:</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 font-bold text-slate-700">
+                            {item.kelas_terdampak}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tombol Aksi Mobile */}
+                    <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                      {hasFullAccess && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStatusModal(item)}
+                          className="flex-1 min-w-[125px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 shadow-2xs transition active:scale-95 cursor-pointer"
+                        >
+                          <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Status &amp; Surat</span>
+                        </button>
+                      )}
+
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(item)}
+                          className="flex-1 min-w-[95px] inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 shadow-2xs transition active:scale-95 cursor-pointer"
+                          title="Edit tanggal, jenis, surat, atau ketidaksamaan data dengan yayasan"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-white/90" />
+                          <span>Edit Data</span>
+                        </button>
+                      )}
+
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(item)}
+                          className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 shadow-2xs transition active:scale-95 cursor-pointer"
+                          title="Hapus / Batalkan Catatan"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-white/90" />
+                          <span>Hapus</span>
+                        </button>
+                      )}
+
+                      {!canEdit && !canDelete && !hasFullAccess && (
+                        <span className="w-full text-center py-1.5 text-[11px] text-slate-400 font-medium bg-slate-50 rounded-xl border border-slate-100">
+                          Catatan Terverifikasi / Terkunci
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="bg-white p-7 rounded-2xl border border-slate-200 text-center space-y-3">
+                <CalendarX className="w-9 h-9 text-slate-300 mx-auto" />
+                <h4 className="font-bold text-slate-800 text-sm">Tidak Ada Catatan Ketidakhadiran</h4>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                  {filterBulan !== 'all'
+                    ? `Tidak ada data pada bulan ${availableMonths.find((m) => m.value === filterBulan)?.label || filterBulan}. Anda dapat mengganti filter bulan atau menampilkan seluruh bulan.`
+                    : 'Belum ada catatan ketidakhadiran yang cocok dengan kriteria pencarian.'}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  {filterBulan !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterBulan('all')}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                    >
+                      Tampilkan Semua Bulan
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('form')}
+                    className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+                  >
+                    Tambah Pengajuan Baru
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Footer Summary */}
+            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-center text-xs text-slate-500 space-y-1">
+              <p className="font-semibold text-slate-700">
+                Menampilkan {displayList.length} dari total {ketidakhadiranList.length} data ketidakhadiran
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Tersinkronisasi otomatis dengan Google Spreadsheet SMPIT Pondok Duta
+              </p>
             </div>
           </div>
         </div>
@@ -1329,6 +1929,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       return;
                     }
                     setFormFile(file);
+                    setFormAdaSurat('Ada Surat');
                     setFeedback(null);
                   }
                 }}
@@ -1353,6 +1954,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                         return;
                       }
                       setFormFile(file);
+                      setFormAdaSurat('Ada Surat');
                       setFeedback(null);
                     }
                   }}
@@ -1421,6 +2023,39 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* 7. Status Kelengkapan Berkas Surat (Ada Surat / Tidak Ada) */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+              <label className="block text-xs font-bold text-slate-800">
+                Status Kelengkapan Surat Fisik / Berkas Resmi <span className="text-rose-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormAdaSurat('Ada Surat')}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    formAdaSurat === 'Ada Surat' || Boolean(formFile)
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileCheck className="w-4 h-4" />
+                  <span>Ada Surat</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormAdaSurat('Tidak Ada')}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    formAdaSurat === 'Tidak Ada' && !formFile
+                      ? 'bg-slate-700 text-white border-slate-800 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                  <span>Tidak Ada</span>
+                </button>
+              </div>
             </div>
 
             {/* Tombol Simpan */}
@@ -1506,7 +2141,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                 REKAPITULASI DAFTAR KETIDAKHADIRAN GURU & TENAGA KEPENDIDIKAN
               </h3>
               <p className="text-xs text-slate-600">
-                Tahun Ajaran {config.academic_year || '2026/2027'} • Periode 1 Tahun Kalender Penuh
+                Tahun Ajaran {config.academic_year || '2026/2027'}
               </p>
             </div>
 
@@ -1519,6 +2154,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                     <th className="py-2.5 px-3 border border-slate-300 w-32 text-center">Tanggal</th>
                     <th className="py-2.5 px-3 border border-slate-300">Nama Guru / Tendik</th>
                     <th className="py-2.5 px-3 border border-slate-300 text-center w-24">Jenis</th>
+                    <th className="py-2.5 px-3 border border-slate-300 text-center w-24">Ada Surat</th>
                     <th className="py-2.5 px-3 border border-slate-300">Keterangan / Alasan</th>
                     <th className="py-2.5 px-3 border border-slate-300 w-36">Inval (Guru Pengganti)</th>
                     <th className="py-2.5 px-3 border border-slate-300 text-center w-24">Status</th>
@@ -1535,6 +2171,11 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       </td>
                       <td className="py-2 px-3 border border-slate-300 font-bold">{item.nama}</td>
                       <td className="py-2 px-3 border border-slate-300 text-center font-semibold">{item.jenis}</td>
+                      <td className="py-2 px-3 border border-slate-300 text-center font-bold text-slate-700">
+                        {item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat)
+                          ? 'Ada Surat'
+                          : 'Tidak Ada'}
+                      </td>
                       <td className="py-2 px-3 border border-slate-300">{item.keterangan}</td>
                       <td className="py-2 px-3 border border-slate-300">{item.inval_guru || '-'}</td>
                       <td className="py-2 px-3 border border-slate-300 text-center font-bold text-emerald-800">
@@ -1980,6 +2621,433 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Ya, Hapus Ajuan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 1: UBAH STATUS & KELENGKAPAN SURAT (Tata Usaha / Admin / Kepala Sekolah) */}
+      {statusModalItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Verifikasi Status &amp; Surat
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Otoritas Tata Usaha / Admin / Kepala Sekolah
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStatusModalItem(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Info Pegawai */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Nama Guru / Tendik:</span>
+                <strong className="text-slate-900 font-bold">{statusModalItem.nama}</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">NIP / Mapel:</span>
+                <span className="font-mono text-slate-700">{statusModalItem.nip} • {statusModalItem.mapel || 'Guru'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Tanggal:</span>
+                <span className="font-semibold text-slate-800">
+                  {statusModalItem.tanggal_awal === statusModalItem.tanggal_akhir || !statusModalItem.tanggal_akhir
+                    ? statusModalItem.tanggal_awal
+                    : `${statusModalItem.tanggal_awal} s.d ${statusModalItem.tanggal_akhir}`}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Jenis Izin/Sakit:</span>
+                <span className="font-bold text-rose-700">{statusModalItem.jenis}</span>
+              </div>
+            </div>
+
+            {/* 1. Status Perubahan */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Pilih Status Verifikasi <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={statusModalStatus}
+                onChange={(e) => setStatusModalStatus(e.target.value as StatusKetidakhadiran)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 focus:border-indigo-600 outline-none cursor-pointer"
+              >
+                <option value="Disetujui">✓ Disetujui (Disposisi Pimpinan/TU)</option>
+                <option value="Diverifikasi">✓ Diverifikasi (Telah Diperiksa)</option>
+                <option value="Menunggu">⏳ Menunggu Verifikasi</option>
+                <option value="Ditolak">✕ Tidak Disetujui / Ditolak</option>
+              </select>
+            </div>
+
+            {/* 2. Kolom Ada Surat / Tidak (Diisi oleh Tata Usaha / Admin / Kepsek) */}
+            <div className="space-y-2 p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/90">
+              <label className="block text-xs font-black text-amber-950">
+                Kolom Kelengkapan Surat (Ada Surat / Tidak):
+              </label>
+              <p className="text-[11px] text-amber-800 leading-snug">
+                Pilih ketersediaan surat fisik atau lampiran dokter/dinas resmi saat melakukan perubahan status:
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStatusModalAdaSurat('Ada Surat')}
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    statusModalAdaSurat === 'Ada Surat'
+                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <FileCheck className="w-4 h-4" />
+                  <span>Ada Surat</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusModalAdaSurat('Tidak Ada')}
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    statusModalAdaSurat === 'Tidak Ada'
+                      ? 'bg-slate-700 text-white border-slate-800 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <X className="w-4 h-4" />
+                  <span>Tidak Ada</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Catatan Tambahan (Opsional) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Catatan Verifikasi Tata Usaha / Admin (Opsional)
+              </label>
+              <textarea
+                value={statusModalCatatan}
+                onChange={(e) => setStatusModalCatatan(e.target.value)}
+                rows={2}
+                placeholder="Contoh: Surat fisik telah diterima di meja TU / Syafakillah..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:border-indigo-600 outline-none resize-none"
+              />
+            </div>
+
+            {/* Aksi Tombol */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setStatusModalItem(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveStatusModal}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Simpan Status &amp; Surat</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: EDIT DATA KETIDAKHADIRAN (Aksi Editing jika ada perbedaan tanggal / data yayasan) */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 my-8 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    Edit Data Ketidakhadiran Guru &amp; Ditendik
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Perbaiki tanggal atau sesuaikan perbedaan catatan dengan pihak Yayasan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* 1. Pilih Pegawai */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Nama Guru / Tendik <span className="text-rose-500">*</span>
+                </label>
+                {hasFullAccess ? (
+                  <select
+                    value={editNip}
+                    onChange={(e) => setEditNip(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-indigo-600 outline-none cursor-pointer"
+                  >
+                    {allTeachers.map((t) => (
+                      <option key={t.nip} value={t.nip}>
+                        {t.nama} ({t.mapel || 'Guru'}) - NIP: {t.nip}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800">
+                    {editingItem.nama} (NIP: {editingItem.nip})
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Rentang Tanggal (Perbedaan tanggal atau ketidaksamaan dengan yayasan) */}
+              <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-blue-950 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Penyesuaian Tanggal Ketidakhadiran</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">
+                    Sinkronisasi Yayasan
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Tanggal Mulai <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={editTanggalAwal}
+                      onChange={(e) => {
+                        setEditTanggalAwal(e.target.value);
+                        if (!editTanggalAkhir || editTanggalAkhir < e.target.value) {
+                          setEditTanggalAkhir(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-blue-600 outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Tanggal Selesai
+                    </label>
+                    <input
+                      type="date"
+                      value={editTanggalAkhir}
+                      min={editTanggalAwal}
+                      onChange={(e) => setEditTanggalAkhir(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-blue-600 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Jenis & Kolom Ada Surat / Tidak */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Jenis Ketidakhadiran <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={editJenis}
+                    onChange={(e) => setEditJenis(e.target.value as JenisKetidakhadiran)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-900 focus:border-indigo-600 outline-none cursor-pointer"
+                  >
+                    <option value="Sakit">Sakit</option>
+                    <option value="Izin">Izin</option>
+                    <option value="Cuti">Cuti</option>
+                    <option value="Dinas Luar">Dinas Luar / Pelatihan</option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Kolom Ada Surat / Tidak <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditAdaSurat('Ada Surat')}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                        editAdaSurat === 'Ada Surat'
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <FileCheck className="w-3.5 h-3.5" />
+                      <span>Ada Surat</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditAdaSurat('Tidak Ada')}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                        editAdaSurat === 'Tidak Ada'
+                          ? 'bg-slate-700 text-white border-slate-800 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Tidak Ada</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Status Verifikasi (Khusus Tata Usaha / Admin / Kepsek) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Status Verifikasi Kehadiran
+                </label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as StatusKetidakhadiran)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-900 focus:border-indigo-600 outline-none cursor-pointer"
+                >
+                  <option value="Disetujui">✓ Disetujui Pimpinan / Tata Usaha</option>
+                  <option value="Diverifikasi">✓ Diverifikasi</option>
+                  <option value="Menunggu">⏳ Menunggu Verifikasi</option>
+                  <option value="Ditolak">✕ Tidak Disetujui</option>
+                </select>
+              </div>
+
+              {/* 5. Guru Pengganti (Inval) & Kelas Terdampak */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Guru Pengganti / Inval (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editInval}
+                    onChange={(e) => setEditInval(e.target.value)}
+                    placeholder="Nama guru pengganti atau Tugas Mandiri"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:border-indigo-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Kelas Terdampak (Opsional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editKelas}
+                    onChange={(e) => setEditKelas(e.target.value)}
+                    placeholder="Contoh: Kelas 7A, 8B"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:border-indigo-600 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* 6. Keterangan / Alasan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Keterangan / Alasan Detail <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  value={editKeterangan}
+                  onChange={(e) => setEditKeterangan(e.target.value)}
+                  rows={2}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:border-indigo-600 outline-none resize-none"
+                  required
+                />
+              </div>
+
+              {/* 7. Catatan Admin / Tata Usaha */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Catatan Admin / Tata Usaha (Sinkronisasi Catatan Yayasan)
+                </label>
+                <input
+                  type="text"
+                  value={editCatatanAdmin}
+                  onChange={(e) => setEditCatatanAdmin(e.target.value)}
+                  placeholder="Contoh: Tanggal disesuaikan dengan laporan presensi yayasan"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 focus:border-indigo-600 outline-none"
+                />
+              </div>
+
+              {/* 8. Berkas Bukti Surat Baru (Opsional) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+                <label className="block font-bold text-slate-700">
+                  Perbarui Berkas Bukti Surat (Opsional)
+                </label>
+                {editBuktiUrl && !editFile && (
+                  <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-slate-200">
+                    <span className="text-[11px] text-purple-700 font-mono truncate max-w-[280px]">
+                      {editBuktiName || 'Berkas surat saat ini tersedia'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenBukti(editBuktiUrl, editBuktiName)}
+                      className="text-[11px] font-bold text-purple-700 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Lihat</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setEditFile(e.target.files[0]);
+                      setEditAdaSurat('Ada Surat');
+                    }
+                  }}
+                  className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Aksi Tombol Edit */}
+            <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setEditingItem(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditModal}
+                disabled={isSavingEdit}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-800 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                {isSavingEdit ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Simpan Perubahan Data</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

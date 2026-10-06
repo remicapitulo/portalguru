@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'ketidakhadiran',
-      label: 'Daftar Ketidakhadiran',
+      label: 'Ketidakhadiran Guru & Tendik',
       shortLabel: 'Ketidakhadiran',
       icon: <CalendarX className="w-5 h-5 text-rose-400 shrink-0" />,
       badge: 'Izin/Sakit',

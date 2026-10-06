@@ -120,7 +120,7 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
     const identitasHeaders = [['Data Pendidik', '', 'Periode Penilaian', '']];
     const identitasRows = [
       ['Nama Lengkap', `: ${selectedTeacher.nama}`, 'Tahun Pelajaran', `: ${academicYear}`],
-      ['NIP / ID', `: ${selectedTeacher.nip}`, 'Periode', ': 1 Tahun Kalender'],
+      ['NIP / ID', `: ${selectedTeacher.nip}`, 'Semester', `: ${semester}`],
       ['Jabatan / Mapel', `: ${selectedTeacher.mapel || 'Guru Mata Pelajaran'}`, 'Tanggal Cetak', `: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`],
     ];
 
@@ -348,8 +348,8 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
                 <span className="font-mono text-slate-800">: {selectedTeacher.nip}</span>
               </div>
               <div className="flex">
-                <span className="w-32 font-bold text-slate-500">Periode</span>
-                <span className="font-semibold text-slate-800">: 1 Tahun Kalender Penuh</span>
+                <span className="w-32 font-bold text-slate-500">Semester</span>
+                <span className="font-semibold text-slate-800">: {semester}</span>
               </div>
               <div className="flex">
                 <span className="w-32 font-bold text-slate-500">Tugas / Mapel</span>

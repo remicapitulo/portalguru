@@ -123,6 +123,7 @@ export interface KetidakhadiranItem {
   kelas_terdampak?: string; // e.g. Kelas 7A, 8B
   surat_bukti_url?: string; // URL surat dokter / tugas / izin
   surat_bukti_name?: string;
+  ada_surat?: 'Ada Surat' | 'Tidak Ada' | 'Ada' | 'Tidak' | string;
   status: StatusKetidakhadiran;
   catatan_admin?: string;
   created_at: string;

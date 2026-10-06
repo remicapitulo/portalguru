@@ -600,7 +600,7 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
                 </span>
                 <h3 className="text-lg font-black text-white">{selectedDetail.teacher.nama}</h3>
                 <p className="text-xs text-purple-200 mt-0.5">
-                  NIP: {selectedDetail.teacher.nip} • Mapel: {selectedDetail.teacher.mapel || 'Guru'} • TA {academicYear} (1 Tahun Kalender Penuh)
+                  NIP: {selectedDetail.teacher.nip} • Mapel: {selectedDetail.teacher.mapel || 'Guru'} • TA {academicYear}
                 </p>
               </div>
               <button

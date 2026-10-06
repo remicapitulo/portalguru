@@ -156,11 +156,21 @@ class GoogleSpreadsheetService {
         }
         const hNip = s.headmaster_nip ?? s.headmaster_nik ?? s.nik_kepala ?? s.nip_kepala ?? s.nik_kepsek ?? s.nip_kepsek;
         if (hNip !== undefined && hNip !== null && String(hNip).trim() !== '' && String(hNip).trim() !== '197508152002121003') {
-          configUpdates.headmaster_nip = String(hNip).trim();
-          configUpdates.headmaster_nik = String(hNip).trim();
+          const strNip = String(hNip).trim();
+          // Nilam Cahya's NIP (03.18.10.49) must not be set as headmaster_nip
+          if (strNip === '03.18.10.49' || strNip === '02.20.09.112') {
+            configUpdates.headmaster_nip = '03.13.01.13';
+            configUpdates.headmaster_nik = '03.13.01.13';
+          } else {
+            configUpdates.headmaster_nip = strNip;
+            configUpdates.headmaster_nik = strNip;
+          }
+        } else {
+          configUpdates.headmaster_nip = '03.13.01.13';
+          configUpdates.headmaster_nik = '03.13.01.13';
         }
 
-        // Vice Headmaster Name & NIK/NIP
+        // Vice Headmaster Name & NIK/NIP (Nilam Cahya, S.Pd)
         if (s.vice_headmaster && s.vice_headmaster !== 'Drs. H. Ahmad Fauzi, M.Pd') {
           configUpdates.vice_headmaster = String(s.vice_headmaster).trim();
         }
@@ -168,6 +178,9 @@ class GoogleSpreadsheetService {
         if (vNip !== undefined && vNip !== null && String(vNip).trim() !== '' && String(vNip).trim() !== '197805122005011002') {
           configUpdates.vice_headmaster_nip = String(vNip).trim();
           configUpdates.vice_headmaster_nik = String(vNip).trim();
+        } else {
+          configUpdates.vice_headmaster_nip = '03.18.10.49';
+          configUpdates.vice_headmaster_nik = '03.18.10.49';
         }
 
         if (s.vice_headmaster_title) configUpdates.vice_headmaster_title = String(s.vice_headmaster_title).trim();

@@ -302,9 +302,6 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
             </label>
             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 flex items-center justify-between">
               <span>{academicYear}</span>
-              <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">
-                1 Tahun Kalender
-              </span>
             </div>
           </div>
         </div>
@@ -361,7 +358,7 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
           <div className="space-y-1">
             <h4 className="font-black text-amber-900 text-sm">Mode Penilaian Diri Sendiri (Self-Assessment) Aktif</h4>
             <p className="text-amber-800 leading-relaxed">
-              Anda sedang melakukan evaluasi mandiri atas kinerja dan keteladanan Anda selama <strong>1 Tahun Kalender {academicYear}</strong>. Berikan penilaian yang objektif, jujur, dan reflektif demi pengembangan kompetensi diri berkelanjutan.
+              Anda sedang melakukan evaluasi mandiri atas kinerja dan keteladanan Anda selama <strong>Tahun Ajaran {academicYear}</strong>. Berikan penilaian yang objektif, jujur, dan reflektif demi pengembangan kompetensi diri berkelanjutan.
             </p>
           </div>
         </div>
@@ -437,8 +434,8 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
               </div>
             </div>
 
-            {/* Assessment Table */}
-            <div className="overflow-x-auto">
+            {/* Assessment Table - DESKTOP VIEW (hidden on mobile to prevent horizontal scrolling) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[620px]">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-100/70 text-slate-700 text-xs font-extrabold uppercase">
@@ -501,6 +498,100 @@ export const PenilaianRekanTab: React.FC<PenilaianRekanTabProps> = ({
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Assessment Cards - MOBILE VIEW (Dropdown Selector, no horizontal scroll, elegant & responsive) */}
+            <div className="block md:hidden p-3.5 sm:p-5 space-y-3.5 bg-slate-50/60">
+              <div className="flex items-center justify-between text-xs text-slate-500 pb-1">
+                <span className="font-bold text-slate-700 uppercase text-[11px] tracking-wider">
+                  8 Indikator Adab & Etika
+                </span>
+                <span className="text-[11px] text-purple-700 font-bold">
+                  {filledIndicatorsCount} / 8 Terisi
+                </span>
+              </div>
+
+              {INDIKATOR_PENILAIAN.map((ind, idx) => {
+                const currentScore = scores[ind.key];
+                const isSelected = (currentScore || 0) > 0;
+                return (
+                  <div
+                    key={ind.key}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isSelected
+                        ? 'bg-white border-purple-200/90 shadow-xs'
+                        : 'bg-white border-slate-200 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5 mb-2.5">
+                      <span
+                        className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center shrink-0 mt-0.5 ${
+                          isSelected
+                            ? 'bg-purple-700 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {ind.code}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4 className="font-extrabold text-xs text-slate-900 leading-snug">
+                            {ind.title}
+                          </h4>
+                          {isSelected && (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          {ind.deskripsi}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Mobile Dropdown Score Selector */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-bold text-slate-600">
+                          Pilih Skor:
+                        </label>
+                        {isSelected && (
+                          <span
+                            className={`px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold border ${
+                              SKOR_LABELS[currentScore as keyof typeof SKOR_LABELS]?.color ||
+                              'bg-purple-100 text-purple-800'
+                            }`}
+                          >
+                            Skor: {currentScore} ({SKOR_LABELS[currentScore as keyof typeof SKOR_LABELS]?.label || ''})
+                          </span>
+                        )}
+                      </div>
+
+                      <select
+                        value={currentScore || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setScores((prev) => ({
+                            ...prev,
+                            [ind.key]: val,
+                          }));
+                        }}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition outline-none cursor-pointer ${
+                          isSelected
+                            ? 'border-purple-300 bg-purple-50/40 text-purple-950 focus:border-purple-600'
+                            : 'border-slate-300 bg-white text-slate-600 focus:border-purple-500'
+                        }`}
+                      >
+                        <option value="">-- Pilih Nilai Skor (Wajib) --</option>
+                        {SKOR_OPTIONS.map((scoreVal) => (
+                          <option key={scoreVal} value={scoreVal}>
+                            {scoreVal} - {SKOR_LABELS[scoreVal].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="p-5 sm:p-7 border-t border-slate-100 bg-slate-50/50 space-y-4">
