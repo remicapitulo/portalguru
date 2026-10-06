@@ -70,20 +70,16 @@ class FlexibleDatabaseService {
 
           // Clean up any remaining dummy values from old cache to avoid confusion
           const isDummyHeadmaster = !parsed.config.headmaster || parsed.config.headmaster === 'H. Sudirman, M.Pd.I';
-          const isDummyHeadmasterNip = !parsed.config.headmaster_nip || parsed.config.headmaster_nip === '197508152002121003';
+          const isInvalidHeadmasterNip = !parsed.config.headmaster_nip || parsed.config.headmaster_nip === '197508152002121003' || parsed.config.headmaster_nip === '03.18.10.49';
           const isDummyVice = !parsed.config.vice_headmaster || parsed.config.vice_headmaster === 'Drs. H. Ahmad Fauzi, M.Pd';
-          const isDummyViceNip = !parsed.config.vice_headmaster_nip || parsed.config.vice_headmaster_nip === '197805122005011002';
+          const isInvalidViceNip = !parsed.config.vice_headmaster_nip || parsed.config.vice_headmaster_nip === '197805122005011002' || parsed.config.vice_headmaster_nip === '02.20.09.112';
 
-          if (isDummyHeadmaster || isDummyHeadmasterNip || isDummyVice || isDummyViceNip) {
+          if (isDummyHeadmaster || isInvalidHeadmasterNip || isDummyVice || isInvalidViceNip) {
             needsResave = true;
           }
 
-          const cleanViceNip = isDummyViceNip
-            ? '02.20.09.112'
-            : (parsed.config.vice_headmaster_nip || parsed.config.vice_headmaster_nik || '02.20.09.112');
-          const cleanHeadNip = isDummyHeadmasterNip
-            ? '03.18.10.49'
-            : (parsed.config.headmaster_nip || parsed.config.headmaster_nik || '03.18.10.49');
+          const cleanViceNip = '03.18.10.49';
+          const cleanHeadNip = '03.13.01.13';
 
           parsed.config = {
               ...initialConfig,
@@ -92,15 +88,13 @@ class FlexibleDatabaseService {
               foundation_name: (!parsed.config.foundation_name || parsed.config.foundation_name === 'Yayasan Pondok Duta')
                 ? 'Yayasan Perguruan Islam Pondok Duta'
                 : parsed.config.foundation_name,
-              headmaster: isDummyHeadmaster ? 'Abu Haripin, M.Pd' : parsed.config.headmaster,
+              headmaster: 'Abu Haripin, M.Pd',
               headmaster_nip: cleanHeadNip,
               headmaster_nik: cleanHeadNip,
-              vice_headmaster: isDummyVice ? 'Nilam Cahya, S.Pd' : parsed.config.vice_headmaster,
+              vice_headmaster: 'Nilam Cahya, S.Pd',
               vice_headmaster_nip: cleanViceNip,
               vice_headmaster_nik: cleanViceNip,
-              vice_headmaster_title: (!parsed.config.vice_headmaster_title || parsed.config.vice_headmaster_title.includes('Administrasi'))
-                ? 'Tim Kurikulum'
-                : parsed.config.vice_headmaster_title,
+              vice_headmaster_title: 'Tim Kurikulum',
               school_logo_url: parsed.config.school_logo_url || 'https://lh3.googleusercontent.com/d/1mnkKRHv-bqHsof1Lz4qdJd-o',
               logo_folder_id: parsed.config.logo_folder_id || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ',
               penilaian_spreadsheet_id: (!parsed.config.penilaian_spreadsheet_id || parsed.config.penilaian_spreadsheet_id === '1D84CHqZvo7DQyhZ90uCphJhcOjDQh7EKt4Psey3BqdY')
@@ -142,6 +136,42 @@ class FlexibleDatabaseService {
                 needsResave = true;
               }
             });
+          }
+
+          // Strict user deduplication on load to prevent duplicate accounts (e.g., duplicate Abu Haripin)
+          if (Array.isArray(parsed.users) && parsed.users.length > 0) {
+            const seenNips = new Set<string>();
+            const seenNames = new Set<string>();
+            const uniqueUsers: User[] = [];
+
+            for (const u of parsed.users) {
+              if (!u || !u.nama) continue;
+              const cleanNip = String(u.nip || '').trim().toLowerCase();
+              const cleanName = String(u.nama || '').trim().toLowerCase();
+
+              if (cleanNip && cleanNip !== 'admin') {
+                if (seenNips.has(cleanNip)) {
+                  needsResave = true;
+                  continue;
+                }
+                seenNips.add(cleanNip);
+              }
+
+              if (cleanName && cleanName !== 'guru' && cleanName !== 'administrator sekolah') {
+                if (seenNames.has(cleanName)) {
+                  needsResave = true;
+                  continue;
+                }
+                seenNames.add(cleanName);
+              }
+
+              uniqueUsers.push(u);
+            }
+
+            if (uniqueUsers.length !== parsed.users.length) {
+              parsed.users = uniqueUsers;
+              needsResave = true;
+            }
           }
 
           if (needsResave) {
@@ -236,7 +266,7 @@ class FlexibleDatabaseService {
 
   public getTeachers(): User[] {
     return this.db.users
-      .filter((u) => !u.role || (u.role.toLowerCase() !== 'administrator' && u.nip.toLowerCase() !== 'admin'))
+      .filter((u) => u && u.nip && u.nip.toLowerCase() !== 'admin' && u.nama && u.nama.trim().toLowerCase() !== 'guru' && u.nama.trim() !== '')
       .sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' }));
   }
 
@@ -250,13 +280,31 @@ class FlexibleDatabaseService {
       (u) => u && u.nip && u.nip.trim() !== '' && u.nama && u.nama.trim() !== '' && u.nama !== 'Guru'
     );
     if (valid.length >= 2) {
+      // Deduplicate strictly by clean NIP and clean name
+      const seenNips = new Set<string>();
+      const seenNames = new Set<string>();
+      const deduplicated: User[] = [];
+
+      for (const u of valid) {
+        const cleanNip = u.nip.trim().toLowerCase();
+        const cleanName = u.nama.trim().toLowerCase();
+        if (cleanNip !== 'admin') {
+          if (seenNips.has(cleanNip) || seenNames.has(cleanName)) {
+            continue;
+          }
+          seenNips.add(cleanNip);
+          seenNames.add(cleanName);
+        }
+        deduplicated.push(u);
+      }
+
       // Sort teachers alphabetically (preserving administrator at the top)
-      valid.sort((a, b) => {
+      deduplicated.sort((a, b) => {
         if (a.role?.toLowerCase() === 'administrator') return -1;
         if (b.role?.toLowerCase() === 'administrator') return 1;
         return (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' });
       });
-      this.db.users = valid;
+      this.db.users = deduplicated;
       this.saveToStorage();
     }
   }

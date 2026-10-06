@@ -1174,23 +1174,29 @@ class PenilaianService {
     const nip = (user.nip || '').trim();
     const role = (user.role || '').toLowerCase().trim();
 
-    if (role === 'kepala_sekolah' || role === 'kepala sekolah' || role.includes('kepala')) return true;
-
-    // Check config headmaster nip or nik
-    if (config?.headmaster_nip && nip === config.headmaster_nip.trim()) return true;
-    if (config?.headmaster_nik && nip === config.headmaster_nik.trim()) return true;
-
-    // Check config headmaster name
-    if (config?.headmaster) {
-      const headName = config.headmaster.toLowerCase().trim();
-      const cleanHead = headName.replace(/,\s*[a-z\.\s]+$/i, '').trim();
-      if ((cleanHead.length > 2 && name.includes(cleanHead)) || headName.includes(name)) return true;
+    // Nilam Cahya is Wakil Kepala Sekolah / Tim Kurikulum (Tendik), NOT Kepala Sekolah
+    if (name.includes('nilam') || nip === '03.18.10.49' || nip === '02.20.09.112') {
+      return false;
     }
 
-    // Default SMPIT Pondok Duta Headmaster
-    if (name.includes('abu haripin') || nip === '03.18.10.49' || nip === '03.13.01.13') return true;
+    // Bot admin account is not headmaster
+    if (nip.toLowerCase() === 'admin' || name.includes('administrator sekolah')) {
+      return false;
+    }
 
-    if (role === 'administrator') return true;
+    // Abu Haripin, M.Pd is the SOLE Kepala Sekolah of SMPIT Pondok Duta
+    if (name.includes('abu haripin') || nip === '03.13.01.13') {
+      return true;
+    }
+
+    if (role === 'kepala_sekolah' || role === 'kepala sekolah' || role === 'kepsek' || role === 'headmaster') {
+      return true;
+    }
+
+    // Check config headmaster nip or nik (strictly not Nilam's NIP)
+    if (config?.headmaster_nip && nip === config.headmaster_nip.trim() && nip !== '03.18.10.49') return true;
+    if (config?.headmaster_nik && nip === config.headmaster_nik.trim() && nip !== '03.18.10.49') return true;
+
     return false;
   }
 

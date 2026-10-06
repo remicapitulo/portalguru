@@ -23,11 +23,22 @@ import {
   ArrowRight,
   AlertTriangle,
   FileText,
-  Loader2
+  Loader2,
+  Download,
+  Smartphone,
+  Laptop,
+  Monitor,
+  CheckCircle2,
+  ShieldCheck,
+  Sparkles,
+  QrCode,
+  Share2,
+  Globe
 } from 'lucide-react';
 import { AppDatabase, SchoolConfig } from '../types';
 import { dbService } from '../db/storage';
 import { spreadsheetService } from '../db/spreadsheetService';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface DatabaseManagerViewProps {
   db: AppDatabase;
@@ -40,8 +51,14 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
   config,
   onOpenReportPrint,
 }) => {
-  // Navigation tab state inside database manager
-  const [activeSection, setActiveSection] = useState<'pimpinan' | 'spreadsheet' | 'code'>('pimpinan');
+  // Navigation tab state inside database manager (berdampingan: pimpinan, spreadsheet, code, install)
+  const [activeSection, setActiveSection] = useState<'pimpinan' | 'spreadsheet' | 'code' | 'install'>('pimpinan');
+
+  // PWA Install hook for interactive installation inside Database Manager
+  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const [pwaInstallSuccess, setPwaInstallSuccess] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'android' | 'desktop'>('android');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Config form state
   const [spreadsheetId, setSpreadsheetId] = useState(config.spreadsheet_id || '1fmApuBRDQ2cNFEqtsj9g169WvwoccXjZJSEBLtftKwc');
@@ -56,10 +73,10 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
   const [npsn, setNpsn] = useState(config.npsn || '20276180');
   const [schoolAddress, setSchoolAddress] = useState(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat');
   const [headmaster, setHeadmaster] = useState(config.headmaster || 'Abu Haripin, M.Pd');
-  const [headmasterNip, setHeadmasterNip] = useState(config.headmaster_nip || '03.18.10.49');
+  const [headmasterNip, setHeadmasterNip] = useState(config.headmaster_nip || '03.13.01.13');
   const [viceHeadmaster, setViceHeadmaster] = useState(config.vice_headmaster || 'Nilam Cahya, S.Pd');
   const [viceHeadmasterNip, setViceHeadmasterNip] = useState(
-    config.vice_headmaster_nip || config.vice_headmaster_nik || '02.20.09.112'
+    config.vice_headmaster_nip || config.vice_headmaster_nik || '03.18.10.49'
   );
   const [viceHeadmasterTitle, setViceHeadmasterTitle] = useState(
     !config.vice_headmaster_title || config.vice_headmaster_title.includes('Administrasi')
@@ -106,10 +123,10 @@ export const DatabaseManagerView: React.FC<DatabaseManagerViewProps> = ({
     setNpsn(config.npsn || '20276180');
     setSchoolAddress(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat');
     setHeadmaster(config.headmaster || 'Abu Haripin, M.Pd');
-    setHeadmasterNip(config.headmaster_nip || '03.18.10.49');
+    setHeadmasterNip(config.headmaster_nip || '03.13.01.13');
     setViceHeadmaster(config.vice_headmaster || 'Nilam Cahya, S.Pd');
     setViceHeadmasterNip(
-      config.vice_headmaster_nip || config.vice_headmaster_nik || '02.20.09.112'
+      config.vice_headmaster_nip || config.vice_headmaster_nik || '03.18.10.49'
     );
     setViceHeadmasterTitle(
       !config.vice_headmaster_title || config.vice_headmaster_title.includes('Administrasi')
@@ -388,9 +405,9 @@ function getOrCreateSheet(sheetName) {
       sheet.appendRow(["npsn", "${npsn.trim() || '20276180'}", "Nomor Pokok Sekolah Nasional"]);
       sheet.appendRow(["school_address", "${schoolAddress.trim() || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}", "Alamat Lengkap"]);
       sheet.appendRow(["headmaster", "${headmaster.trim() || 'Abu Haripin, M.Pd'}", "Kepala Sekolah (Tanda Tangan Kiri)"]);
-      sheet.appendRow(["headmaster_nip", "${headmasterNip.trim() || '03.18.10.49'}", "NIK Kepala Sekolah"]);
+      sheet.appendRow(["headmaster_nip", "${headmasterNip.trim() || '03.13.01.13'}", "NIK Kepala Sekolah"]);
       sheet.appendRow(["vice_headmaster", "${viceHeadmaster.trim() || 'Nilam Cahya, S.Pd'}", "Wakil Kepala Sekolah / Tim Kurikulum"]);
-      sheet.appendRow(["vice_headmaster_nip", "${viceHeadmasterNip.trim() || '02.20.09.112'}", "NIK Wakil Kepala Sekolah"]);
+      sheet.appendRow(["vice_headmaster_nip", "${viceHeadmasterNip.trim() || '03.18.10.49'}", "NIK Wakil Kepala Sekolah"]);
       sheet.appendRow(["vice_headmaster_title", "${viceHeadmasterTitle.trim() || 'Tim Kurikulum'}", "Jabatan Penandatangan (Tanda Tangan Kanan)"]);
       sheet.appendRow(["school_logo_url", "${schoolLogoUrl.trim() || ''}", "URL Gambar Logo Sekolah (Google Drive / Online)"]);
       sheet.appendRow(["logo_folder_id", "${logoFolderId.trim() || '1tFn4GYU5d231gJgqXSphAAGlyueOkljJ'}", "Folder Google Drive Logo Sekolah"]);
@@ -1467,6 +1484,19 @@ function deleteUsulanFromSheet(rowIndex) {
           <Code2 className="w-4 h-4 text-emerald-600" />
           <span>Skrip Code.gs Backend</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('install')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+            activeSection === 'install'
+              ? 'bg-white text-indigo-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Download className="w-4 h-4 text-purple-600" />
+          <span>Instalasi Chrome (PWA)</span>
+        </button>
       </div>
 
       {/* TAB 1: PROFIL PIMPINAN, LOGO SEKOLAH & PENANDATANGAN LAPORAN (REVISI UTAMA) */}
@@ -2206,6 +2236,473 @@ function deleteUsulanFromSheet(rowIndex) {
           </pre>
         </div>
       </div>
+      )}
+
+      {/* TAB 4: INSTALASI CHROME (PWA) BERDAMPINGAN DENGAN TAB PROFIL, SPREADSHEET & SKRIP */}
+      {activeSection === 'install' && (
+        <div className="bg-white p-6 lg:p-8 rounded-3xl border border-slate-200/90 shadow-xs space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                <Download className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-slate-900">
+                  Instalasi Aplikasi Portal Guru di Google Chrome (PWA)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Pengaturan pemasangan aplikasi berdampingan dengan profil, spreadsheet &amp; skrip. Jadikan portal ini aplikasi mandiri berkinerja tinggi.
+                </p>
+              </div>
+            </div>
+
+            {/* Direct Action Button */}
+            <div className="flex items-center gap-2">
+              {isInstalled ? (
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Aplikasi Sudah Terpasang</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (isInstallable) {
+                      const ok = await install();
+                      if (ok) setPwaInstallSuccess(true);
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs flex items-center gap-2 shadow-xs hover:shadow transition cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{isInstallable ? 'Instal Sekarang ke Chrome' : 'Coba Pasang di Chrome'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {pwaInstallSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-semibold text-emerald-800 flex items-center gap-2.5 animate-in fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>Selamat! Portal Guru berhasil dipasang di perangkat Anda sebagai aplikasi mandiri.</span>
+            </div>
+          )}
+
+          {/* DUAL-SCREEN LAYOUT: LAYAR KIRI (PANDUAN & STATUS) + LAYAR SEBELAHNYA (PREVIEW VISUAL CHROME) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* ======================================================== */}
+            {/* LAYAR KIRI: STATUS PWA & PANDUAN LANGKAH PEMASANGAN     */}
+            {/* ======================================================== */}
+            <div className="lg:col-span-6 space-y-5">
+              {/* Status Bar */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                    Status Aplikasi
+                  </span>
+                  <p className="font-black text-xs text-slate-900 flex items-center gap-1.5">
+                    {isInstalled ? (
+                      <span className="text-emerald-700">Terpasang</span>
+                    ) : (
+                      <span className="text-amber-700">Siap Pasang</span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                    Service Worker
+                  </span>
+                  <p className="font-black text-xs text-emerald-700 flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Aktif Workbox</span>
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                    Manifest PWA
+                  </span>
+                  <p className="font-black text-xs text-purple-700 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Standar PWA</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Panduan Langkah demi Langkah */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1">
+                  <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-indigo-600" />
+                    <span>1. Di HP / Tablet Android (Google Chrome)</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('android')}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                  >
+                    Lihat Layar Sebelahnya &rarr;
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2 text-xs text-slate-700">
+                  <ol className="list-decimal list-inside space-y-2 leading-relaxed">
+                    <li>
+                      Buka portal ini di browser <strong>Google Chrome</strong> di HP atau Tablet Anda.
+                    </li>
+                    <li>
+                      Ketuk tombol menu titik tiga (<strong className="font-mono text-slate-900 font-bold">⋮</strong>) di sudut kanan atas Chrome.
+                    </li>
+                    <li>
+                      Pilih <strong className="text-indigo-700 font-bold">&ldquo;Instal aplikasi&rdquo;</strong> atau <strong className="text-indigo-700 font-bold">&ldquo;Tambahkan ke Layar Utama&rdquo;</strong> (Add to Home screen).
+                    </li>
+                    <li>
+                      Ketuk tombol <strong>&ldquo;Instal&rdquo;</strong> pada dialog pop-up konfirmasi yang muncul di bawah layar.
+                    </li>
+                    <li>
+                      Ikon <strong>Portal Guru</strong> langsung tampil di layar beranda HP seperti aplikasi Android aslinya!
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1">
+                  <h4 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                    <Laptop className="w-4 h-4 text-blue-600" />
+                    <span>2. Di Laptop / Komputer Desktop (Google Chrome PC)</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('desktop')}
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+                  >
+                    Lihat Layar Sebelahnya &rarr;
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200 space-y-2 text-xs text-slate-700">
+                  <ol className="list-decimal list-inside space-y-2 leading-relaxed">
+                    <li>
+                      Buka portal ini melalui <strong>Google Chrome</strong> di Windows atau Mac.
+                    </li>
+                    <li>
+                      Lihat bilah alamat URL (Address Bar): klik ikon <strong className="text-indigo-700 font-bold">Instal (panah ⤓ di dalam monitor)</strong> di samping bintang bookmark.
+                    </li>
+                    <li>
+                      Atau klik menu titik tiga (<strong className="font-mono text-slate-900 font-bold">⋮</strong>) &gt; <strong className="text-indigo-700 font-bold">&ldquo;Simpan dan bagikan&rdquo;</strong> &gt; <strong className="text-indigo-700 font-bold">&ldquo;Instal Portal Administrasi Guru...&rdquo;</strong>.
+                    </li>
+                    <li>
+                      Klik <strong>&ldquo;Instal&rdquo;</strong>. Aplikasi langsung terbuka dalam jendela mandiri tanpa address bar browser.
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
+              {/* Keuntungan Memasang Aplikasi */}
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/80 space-y-2 text-xs">
+                <span className="font-extrabold text-indigo-950 block text-[11px] uppercase tracking-wider">
+                  Keunggulan Versi Aplikasi:
+                </span>
+                <div className="grid grid-cols-3 gap-2 text-slate-700 text-[10.5px]">
+                  <div className="bg-white p-2 rounded-xl border border-indigo-100">
+                    <strong className="text-indigo-900 block mb-0.5">⚡ 1-Ketuk</strong>
+                    Buka langsung dari Home Screen.
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-indigo-100">
+                    <strong className="text-indigo-900 block mb-0.5">🎯 Bebas Tab</strong>
+                    Tampilan bersih layar penuh.
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-indigo-100">
+                    <strong className="text-indigo-900 block mb-0.5">🔄 Sinkron</strong>
+                    Data tetap live ke Spreadsheet.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* =================================================================================== */}
+            {/* LAYAR SEBELAHNYA: SIMULASI VISUAL TAMPILAN GOOGLE CHROME & QR CODE CEPAT (SIDE-BY-SIDE) */}
+            {/* =================================================================================== */}
+            <div className="lg:col-span-6 space-y-4">
+              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-2xl border border-slate-200">
+                <div className="flex items-center gap-2 pl-2">
+                  <Monitor className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-black text-slate-800">
+                    Layar Sebelahnya: Tampilan di Chrome
+                  </span>
+                </div>
+
+                {/* Device Switcher */}
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl shadow-2xs border border-slate-200/80">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('android')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                      previewDevice === 'android'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Layar HP</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice('desktop')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                      previewDevice === 'desktop'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Laptop className="w-3.5 h-3.5" />
+                    <span>Layar Desktop</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* SIMULASI VISUAL: LAYAR HP ANDROID */}
+              {previewDevice === 'android' ? (
+                <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl shadow-xl border-4 border-slate-800 text-slate-100 max-w-sm mx-auto">
+                  {/* Status Bar HP */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-3 pb-2 border-b border-slate-800 font-mono">
+                    <span>10:45</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>4G</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  {/* Chrome Browser Mobile Bar */}
+                  <div className="bg-slate-800 mt-2 p-2 rounded-xl flex items-center justify-between text-xs gap-2 border border-slate-700">
+                    <div className="flex items-center gap-1.5 text-slate-300 truncate text-[11px] bg-slate-900/80 px-2.5 py-1 rounded-lg flex-1">
+                      <span className="text-emerald-400 text-xs">🔒</span>
+                      <span className="truncate">portal.smpitpondokduta.sch.id</span>
+                    </div>
+                    <div className="relative">
+                      <span className="font-mono text-base text-slate-200 px-1 font-bold">⋮</span>
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-indigo-500 animate-ping"></span>
+                    </div>
+                  </div>
+
+                  {/* Web Page Viewport Preview */}
+                  <div className="bg-slate-50 text-slate-900 mt-2 rounded-2xl p-4 min-h-[220px] flex flex-col justify-between border border-slate-300">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        {schoolLogoUrl ? (
+                          <img src={schoolLogoUrl} alt="Logo" className="w-6 h-6 object-contain" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-md bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center">PD</div>
+                        )}
+                        <span className="font-black text-xs text-slate-900">{schoolName}</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-500">Portal Administrasi Guru &amp; Tendik</p>
+                    </div>
+
+                    {/* Pop-up dialog instalasi Chrome Android yang muncul di layar */}
+                    <div className="bg-white p-3.5 rounded-2xl shadow-lg border-2 border-indigo-500/80 animate-in slide-in-from-bottom duration-300 space-y-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                          PD
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-extrabold text-[11px] text-slate-900 leading-tight">
+                            Tambahkan ke Layar Utama?
+                          </p>
+                          <p className="text-[9.5px] text-slate-400 truncate">
+                            Portal Guru SMPIT Pondok Duta
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                        <span className="text-[10px] text-slate-400 font-bold px-2 py-1">Batal</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (isInstallable) {
+                              const ok = await install();
+                              if (ok) setPwaInstallSuccess(true);
+                            }
+                          }}
+                          className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black shadow-xs cursor-pointer"
+                        >
+                          Instal
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-center text-[10px] text-slate-400 mt-2.5">
+                    Tampilan pop-up resmi saat browser Chrome mendeteksi portal ini
+                  </p>
+                </div>
+              ) : (
+                /* SIMULASI VISUAL: LAYAR DESKTOP / LAPTOP CHROME */
+                <div className="bg-slate-900 p-3 sm:p-4 rounded-3xl shadow-xl border-4 border-slate-800 text-slate-100">
+                  {/* Window Bar */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                    </div>
+                    {/* Chrome Tab */}
+                    <div className="bg-slate-800 px-3 py-1 rounded-t-lg text-[10.5px] font-medium text-slate-200 border-t border-x border-slate-700 flex items-center gap-1.5 max-w-[220px] truncate">
+                      <span className="text-indigo-400 font-bold">🏫</span>
+                      <span className="truncate">Portal Guru - SMPIT Pondok Duta</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono">Chrome Windows/Mac</span>
+                  </div>
+
+                  {/* Chrome Omnibox Desktop */}
+                  <div className="bg-slate-800 mt-2 p-2 rounded-xl flex items-center justify-between text-xs gap-2 border border-slate-700">
+                    <div className="flex items-center gap-2 text-slate-300 truncate text-[11px] bg-slate-900/90 px-3 py-1.5 rounded-lg flex-1">
+                      <span className="text-emerald-400">🔒</span>
+                      <span className="truncate">https://portal-guru.smpitpondokduta.sch.id</span>
+                    </div>
+
+                    {/* Omnibox Install App Button Highlight */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (isInstallable) {
+                            const ok = await install();
+                            if (ok) setPwaInstallSuccess(true);
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10.5px] flex items-center gap-1 shadow-xs animate-pulse cursor-pointer"
+                        title="Klik untuk menginstal aplikasi ke Chrome"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Instal App</span>
+                      </button>
+                      <span className="font-mono text-base text-slate-400 px-1">⋮</span>
+                    </div>
+                  </div>
+
+                  {/* Web Viewport Desktop Mockup */}
+                  <div className="bg-slate-50 text-slate-900 mt-2 rounded-2xl p-4 min-h-[170px] border border-slate-300 flex flex-col justify-between">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <div className="flex items-center gap-2">
+                        {schoolLogoUrl ? (
+                          <img src={schoolLogoUrl} alt="Logo" className="w-6 h-6 object-contain" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-md bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center">PD</div>
+                        )}
+                        <span className="font-extrabold text-xs text-slate-900">{schoolName}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500">TA {academicYear}</span>
+                    </div>
+
+                    {/* Pop-up dialog install Desktop */}
+                    <div className="self-end bg-white p-3 rounded-xl shadow-lg border border-indigo-200 max-w-xs space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Download className="w-4 h-4 text-indigo-600" />
+                        <span className="font-extrabold text-[11px] text-slate-900">Instal aplikasi ini?</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Aplikasi akan ditambahkan ke desktop &amp; menu Windows Anda.
+                      </p>
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (isInstallable) {
+                              const ok = await install();
+                              if (ok) setPwaInstallSuccess(true);
+                            }
+                          }}
+                          className="px-3 py-1 rounded-md bg-indigo-600 text-white font-bold text-[10px] hover:bg-indigo-700 cursor-pointer"
+                        >
+                          Instal
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-center text-[10px] text-slate-400 mt-2">
+                    Ikon instalasi (⤓) otomatis tampil di bilah alamat Chrome Desktop
+                  </p>
+                </div>
+              )}
+
+              {/* QR Code Cepat & Salin Tautan untuk HP */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center gap-2 text-slate-900">
+                  <QrCode className="w-4 h-4 text-indigo-600" />
+                  <span className="font-extrabold text-xs">Pindai QR / Salin Link untuk Buka di Chrome HP:</span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Clean SVG QR Code Representation */}
+                  <div className="w-24 h-24 bg-white p-2 rounded-xl border border-slate-200 shrink-0 shadow-2xs flex items-center justify-center">
+                    <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900 fill-current">
+                      {/* Standard QR Code Matrix SVG Pattern */}
+                      <rect x="0" y="0" width="30" height="30" fill="currentColor" />
+                      <rect x="5" y="5" width="20" height="20" fill="white" />
+                      <rect x="10" y="10" width="10" height="10" fill="currentColor" />
+
+                      <rect x="70" y="0" width="30" height="30" fill="currentColor" />
+                      <rect x="75" y="5" width="20" height="20" fill="white" />
+                      <rect x="80" y="10" width="10" height="10" fill="currentColor" />
+
+                      <rect x="0" y="70" width="30" height="30" fill="currentColor" />
+                      <rect x="5" y="75" width="20" height="20" fill="white" />
+                      <rect x="10" y="80" width="10" height="10" fill="currentColor" />
+
+                      <rect x="35" y="10" width="8" height="8" fill="currentColor" />
+                      <rect x="50" y="10" width="8" height="8" fill="currentColor" />
+                      <rect x="40" y="25" width="15" height="8" fill="currentColor" />
+                      <rect x="10" y="40" width="10" height="15" fill="currentColor" />
+                      <rect x="35" y="40" width="12" height="12" fill="currentColor" />
+                      <rect x="55" y="40" width="10" height="10" fill="currentColor" />
+                      <rect x="75" y="40" width="15" height="8" fill="currentColor" />
+                      <rect x="40" y="60" width="18" height="12" fill="currentColor" />
+                      <rect x="65" y="60" width="10" height="15" fill="currentColor" />
+                      <rect x="40" y="80" width="12" height="10" fill="currentColor" />
+                      <rect x="60" y="80" width="15" height="12" fill="currentColor" />
+                      <rect x="85" y="75" width="10" height="15" fill="currentColor" />
+                    </svg>
+                  </div>
+
+                  <div className="space-y-2 flex-1 w-full">
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Arahkan kamera HP ke kode QR di atas untuk langsung membuka link website di Google Chrome Android dan memasangnya ke Layar Utama.
+                    </p>
+
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        readOnly
+                        value={typeof window !== 'undefined' ? window.location.origin : 'https://smpitpondokduta.sch.id'}
+                        className="flex-1 px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-[11px] font-mono text-slate-600 outline-none truncate"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            navigator.clipboard.writeText(window.location.origin);
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2500);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+                      >
+                        {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedLink ? 'Tersalin!' : 'Salin'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

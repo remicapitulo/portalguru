@@ -12,6 +12,8 @@ import { dbService } from '../db/storage';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 
+import { getUserGroup } from './DataGuruView';
+
 interface ReportPrintViewProps {
   db: AppDatabase;
   config: SchoolConfig;
@@ -29,18 +31,27 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Group filter: Kelompok Guru vs Kelompok Tendik vs Semua
+  const [filterGroup, setFilterGroup] = useState<'guru' | 'tendik' | 'semua'>('guru');
+
   // User configuration options for paper size and orientation
   const [paperSize, setPaperSize] = useState<'a4' | 'f4'>('f4');
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('portrait');
 
   const pagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Filter valid teachers and sort A-Z
-  const teachers = db.users
+  // Filter valid personnel according to group
+  const allStaff = db.users
     .filter(
-      (u) => u && u.nama && u.nama.trim().toLowerCase() !== 'guru' && u.nip && u.nip !== 'admin'
+      (u) => u && u.nama && u.nama.trim().toLowerCase() !== 'guru' && u.nip && u.nip.toLowerCase() !== 'admin'
     )
     .sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id', { sensitivity: 'base' }));
+
+  const teachers = allStaff.filter((u) => {
+    if (filterGroup === 'guru') return getUserGroup(u, config) === 'GURU';
+    if (filterGroup === 'tendik') return getUserGroup(u, config) === 'TENDIK';
+    return true;
+  });
 
   // Indonesian localized date format for document date
   const now = new Date();
@@ -307,6 +318,46 @@ export const ReportPrintView: React.FC<ReportPrintViewProps> = ({
               }`}
             >
               Landscape
+            </button>
+          </div>
+
+          {/* Kelompok Selector: Guru vs Tendik vs Semua */}
+          <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            <span className="px-2 text-[10px] sm:text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
+              Kelompok:
+            </span>
+            <button
+              type="button"
+              onClick={() => setFilterGroup('guru')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterGroup === 'guru'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-extrabold border border-slate-200/80'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              Guru
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterGroup('tendik')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterGroup === 'tendik'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-extrabold border border-slate-200/80'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              Tendik
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterGroup('semua')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterGroup === 'semua'
+                  ? 'bg-white text-indigo-700 shadow-2xs font-extrabold border border-slate-200/80'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              Semua
             </button>
           </div>
         </div>
