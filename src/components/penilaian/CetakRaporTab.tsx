@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import {
-  Printer,
   Download,
+  Loader2,
+  GraduationCap,
   Award,
   ChevronLeft,
   ChevronRight,
@@ -58,6 +59,9 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
     ? penilaianService.calculateSingleRaporDiktendik(selectedTeacher, academicYear, semester)
     : null;
 
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const currentIndex = evaluatedTeachers.findIndex((t) => t.nip === selectedNip);
 
   const handlePrev = () => {
@@ -72,141 +76,439 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
+  // Unduh PDF: Tampilan 100% Identik & Seragam dengan Tampilan Website Rapor
   const handleDownloadPDF = () => {
     if (!selectedTeacher || !raporData) return;
+    setIsDownloading(true);
 
-    const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth(); // 210 mm
 
-    // Kop Surat
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(15, 23, 42);
-    doc.text((config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase(), pageWidth / 2, 14, { align: 'center' });
+      // 1. KOP SURAT RESMI (Persis Standar Laporan Perangkat Pembelajaran)
+      if (config.school_logo_url) {
+        try {
+          doc.addImage(config.school_logo_url, 'PNG', (pageWidth - 14) / 2, 7, 14, 14);
+        } catch {
+          // Logo fallback jika link eksternal tidak dapat dimuat
+        }
+      }
 
-    doc.setFontSize(15);
-    doc.setTextColor(88, 28, 135);
-    doc.text(config.school_name.toUpperCase(), pageWidth / 2, 21, { align: 'center' });
+      const startTextY = config.school_logo_url ? 24.5 : 12;
 
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat', pageWidth / 2, 26, { align: 'center' });
-    doc.text(`NPSN: ${config.npsn || '20276180'} • Status Terakreditasi "A"`, pageWidth / 2, 30, { align: 'center' });
+      // Baris 1: Yayasan Perguruan Islam Pondok Duta
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11.5);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(
+        (config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase(),
+        pageWidth / 2,
+        startTextY,
+        { align: 'center' }
+      );
 
-    // Garis Ganda Kop Surat
-    doc.setDrawColor(88, 28, 135);
-    doc.setLineWidth(1);
-    doc.line(14, 33, pageWidth - 14, 33);
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.4);
-    doc.line(14, 34.2, pageWidth - 14, 34.2);
+      // Baris 2: Nama Sekolah (SMPIT PONDOK DUTA)
+      doc.setFontSize(13.5);
+      doc.setTextColor(23, 37, 84); // blue-950
+      doc.text(
+        (config.school_name || 'SMPIT PONDOK DUTA').toUpperCase(),
+        pageWidth / 2,
+        startTextY + 5.5,
+        { align: 'center' }
+      );
 
-    // Judul Rapor
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(15, 23, 42);
-    doc.text('RAPOR PENILAIAN KINERJA PENDIDIK & TENAGA KEPENDIDIKAN (DIKTENDIK)', pageWidth / 2, 41, { align: 'center' });
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(`Tahun Pelajaran ${academicYear}`, pageWidth / 2, 46, { align: 'center' });
+      // Baris 3: Alamat Sekolah
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(51, 65, 85); // slate-700
+      doc.text(
+        config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat',
+        pageWidth / 2,
+        startTextY + 10,
+        { align: 'center' }
+      );
 
-    // Identitas Guru
-    const identitasHeaders = [['Data Pendidik', '', 'Periode Penilaian', '']];
-    const identitasRows = [
-      ['Nama Lengkap', `: ${selectedTeacher.nama}`, 'Tahun Pelajaran', `: ${academicYear}`],
-      ['NIP / ID', `: ${selectedTeacher.nip}`, 'Semester', `: ${semester}`],
-      ['Jabatan / Mapel', `: ${selectedTeacher.mapel || 'Guru Mata Pelajaran'}`, 'Tanggal Cetak', `: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`],
-    ];
+      // Baris 4: NPSN, Website, & Status
+      doc.setFontSize(7.5);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text(
+        `NPSN: ${config.npsn || '20276180'}  •  Website: smpitpondokduta.sch.id  •  Status: Terakreditasi A`,
+        pageWidth / 2,
+        startTextY + 14,
+        { align: 'center' }
+      );
 
-    autoTable(doc, {
-      body: identitasRows,
-      startY: 50,
-      theme: 'plain',
-      styles: { fontSize: 8.5, cellPadding: 1.5, textColor: [30, 41, 59] },
-      columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 32 },
-        1: { cellWidth: 68 },
-        2: { fontStyle: 'bold', cellWidth: 32 },
-        3: { cellWidth: 50 },
-      },
-    });
+      // Garis Ganda Kop Surat (borderBottom 3.5px double style)
+      const lineY = startTextY + 16.5;
+      doc.setDrawColor(15, 23, 42);
+      doc.setLineWidth(0.8);
+      doc.line(14, lineY, pageWidth - 14, lineY);
+      doc.setLineWidth(0.3);
+      doc.line(14, lineY + 1.2, pageWidth - 14, lineY + 1.2);
 
-    const currentY = (doc as any).lastAutoTable?.finalY || 68;
+      // 2. DOKUMEN TITLE
+      const titleY = lineY + 6.5;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('RAPOR PENILAIAN KINERJA DIKTENDIK', pageWidth / 2, titleY, { align: 'center' });
 
-    // Tabel Penilaian 4 Aspek
-    const tableHeaders = [['No', 'Komponen & Indikator Penilaian', 'Skor', 'Rata-rata Sub', 'Bobot Mutu']];
-    const tableBody = [
-      ['I', 'SUPERVISI PEMBELAJARAN & ADMINISTRASI', '', `${raporData.supervisi.rataRata || '-'}`, 'Baik'],
-      ['1a', '  • KBM (Kegiatan Belajar Mengajar di Kelas)', `${raporData.supervisi.kbm || '-'}`, '', ''],
-      ['1b', '  • Administrasi Guru (Modul Ajar, Prota, Promes, Jurnal)', `${raporData.supervisi.administrasi || '-'}`, '', ''],
-      ['II', 'KEDISIPLINAN & ABSENSI', '', `${raporData.absensi.rataRata || '-'}`, 'Baik'],
-      ['2a', '  • Tingkat Kehadiran', `${raporData.absensi.kehadiran || '-'}`, '', ''],
-      ['2b', '  • Ketepatan Waktu (Keterlambatan)', `${raporData.absensi.keterlambatan || '-'}`, '', ''],
-      ['2c', '  • Kedisiplinan Kepulangan', `${raporData.absensi.kepulangan || '-'}`, '', ''],
-      ['2d', '  • Keikutsertaan Doa Bersama Pagi', `${raporData.absensi.doa_bersama || '-'}`, '', ''],
-      ['2e', '  • Broadcast / Share Eflyer Media Sosial Sekolah', `${raporData.absensi.share_eflayer || '-'}`, '', ''],
-      ['III', 'PARTISIPASI KEGIATAN YAYASAN PONDOK DUTA', '', `${raporData.yayasan.rataRata || '-'}`, 'Baik'],
-      ['3a', '  • Kehadiran Milad Yayasan', `${raporData.yayasan.milad || '-'}`, '', ''],
-      ['3b', '  • Keaktifan Ta\'lim / Pengajian Rutin Yayasan', `${raporData.yayasan.talim || '-'}`, '', ''],
-      ['3c', '  • Sosialisasi & Agenda Yayasan', `${raporData.yayasan.sosialisasi || '-'}`, '', ''],
-      ['IV', `ADAB & ETIKA SEJAWAT (${raporData.peerReviewCount} Rekan Penilai)`, '', `${raporData.adab.rataRata || '-'}`, 'Baik'],
-      ['4a', '  • Komunikasi Kepada Pimpinan', `${raporData.adab.komunikasi_pimpinan || '-'}`, '', ''],
-      ['4b', '  • Komunikasi Kepada Siswa', `${raporData.adab.komunikasi_siswa || '-'}`, '', ''],
-      ['4c', '  • Komunikasi Kepada Orang Tua Siswa', `${raporData.adab.komunikasi_ortu || '-'}`, '', ''],
-      ['4d', '  • Komunikasi Kepada Teman Sejawat', `${raporData.adab.komunikasi_sejawat || '-'}`, '', ''],
-      ['4e', '  • Berpakaian Sesuai Ketentuan Seragam', `${raporData.adab.seragam || '-'}`, '', ''],
-      ['4f', '  • Berpakaian Sesuai Adab Islami', `${raporData.adab.adab_pakaian || '-'}`, '', ''],
-      ['4g', '  • Ketaatan Menjalankan Tugas', `${raporData.adab.ketaatan_tugas || '-'}`, '', ''],
-      ['4h', '  • Kerapian Dandanan & Penampilan', `${raporData.adab.dandanan || '-'}`, '', ''],
-      ['', 'TOTAL JUMLAH SKOR KINERJA', '', `${raporData.jumlah}`, ''],
-      ['', 'NILAI AKHIR RAPOR DIKTENDIK', '', `${raporData.rata_rata}`, `Kategori: ${raporData.kategori}`],
-    ];
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Tahun Pelajaran ${academicYear}`, pageWidth / 2, titleY + 4.5, { align: 'center' });
 
-    autoTable(doc, {
-      head: tableHeaders,
-      body: tableBody,
-      startY: currentY + 3,
-      theme: 'grid',
-      styles: { fontSize: 7.8, cellPadding: 2, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [88, 28, 135], textColor: 255, fontStyle: 'bold' },
-      columnStyles: {
-        0: { halign: 'center', cellWidth: 12 },
-        1: { cellWidth: 105 },
-        2: { halign: 'center', cellWidth: 22 },
-        3: { halign: 'center', cellWidth: 25, fontStyle: 'bold' },
-        4: { halign: 'center', cellWidth: 26 },
-      },
-    });
+      // 3. IDENTITAS DIKTENDIK (Kotak Rapi Mirip Web View)
+      const idBoxY = titleY + 7.5;
+      const idBoxHeight = 17.5;
+      doc.setFillColor(248, 250, 252); // bg-slate-50
+      doc.setDrawColor(226, 232, 240); // border-slate-200
+      doc.setLineWidth(0.3);
+      doc.roundedRect(14, idBoxY, pageWidth - 28, idBoxHeight, 2.5, 2.5, 'FD');
 
-    const finalTableY = (doc as any).lastAutoTable?.finalY || 190;
+      const colLeftLabel = 18;
+      const colLeftVal = 44;
+      const colRightLabel = 108;
+      const colRightVal = 138;
 
-    // Catatan Yayasan Box
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text('CATATAN / REKOMENDASI KEPALA SEKOLAH & YAYASAN:', 14, finalTableY + 7);
-    doc.setFont('helvetica', 'normal');
-    doc.text(raporData.catatanYayasan || 'Pertahankan dedikasi amanah mengajar, integritas dakwah, dan kedisiplinan berakhlak mulia di lingkungan SMPIT Pondok Duta.', 14, finalTableY + 12, { maxWidth: pageWidth - 28 });
+      // Baris Identitas 1
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Nama Lengkap', colLeftLabel, idBoxY + 5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`:  ${selectedTeacher.nama}`, colLeftVal, idBoxY + 5);
 
-    // Tanda Tangan: Hanya Kepala Sekolah Saja
-    const signY = finalTableY + 22;
-    const colRight = pageWidth - 50;
+      doc.setTextColor(100, 116, 139);
+      doc.text('Tahun Pelajaran', colRightLabel, idBoxY + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      doc.text(`:  ${academicYear}`, colRightVal, idBoxY + 5);
 
-    doc.setFontSize(8.5);
-    doc.text(`Depok, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, colRight, signY, { align: 'center' });
-    doc.text('Kepala Sekolah,', colRight, signY + 5, { align: 'center' });
+      // Baris Identitas 2
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('NIP / ID Guru', colLeftLabel, idBoxY + 10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      doc.text(`:  ${selectedTeacher.nip}`, colLeftVal, idBoxY + 10);
 
-    doc.setFont('helvetica', 'bold');
-    doc.text(config.headmaster || 'Abu Haripin, M.Pd', colRight, signY + 24, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.text(`NIP: ${config.headmaster_nip || '03.18.10.49'}`, colRight, signY + 28, { align: 'center' });
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('Semester', colRightLabel, idBoxY + 10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      doc.text(`:  ${semester}`, colRightVal, idBoxY + 10);
 
-    doc.save(`Rapor_Diktendik_${selectedTeacher.nama.replace(/[^a-zA-Z0-9]/g, '_')}_${academicYear.replace('/', '_')}.pdf`);
+      // Baris Identitas 3
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('Tugas / Mapel', colLeftLabel, idBoxY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      doc.text(`:  ${selectedTeacher.mapel || 'Guru Mata Pelajaran'}`, colLeftVal, idBoxY + 15);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139);
+      doc.text('Tanggal Cetak', colRightLabel, idBoxY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      doc.text(`:  ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, colRightVal, idBoxY + 15);
+
+      // 4. TABEL PENILAIAN 4 ASPEK (Exact Match Format Website)
+      const tableStartY = idBoxY + idBoxHeight + 3;
+
+      const tableHead = [
+        ['No', 'Komponen & Indikator Kinerja', 'Skor Riil', 'Rata-rata Sub', 'Kategori']
+      ];
+
+      const tableRows: any[] = [
+        // 1. Supervisi
+        [
+          { content: 'I', styles: { fontStyle: 'bold', halign: 'center', fillColor: [245, 243, 255], textColor: [88, 28, 135] } },
+          { content: 'SUPERVISI PEMBELAJARAN & ADMINISTRASI', styles: { fontStyle: 'bold', fillColor: [245, 243, 255], textColor: [88, 28, 135] } },
+          { content: '-', styles: { halign: 'center', fillColor: [245, 243, 255], textColor: [148, 163, 184] } },
+          { content: `${raporData.supervisi.rataRata || '-'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [245, 243, 255], textColor: [88, 28, 135] } },
+          { content: `${raporData.supervisi.rataRata >= 85 ? 'Amat Baik' : 'Cukup'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [245, 243, 255], textColor: [88, 28, 135] } },
+        ],
+        [
+          { content: '1a', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • KBM (Kegiatan Belajar Mengajar di Kelas)', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.supervisi.kbm || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '1b', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Kelengkapan Administrasi (Modul Ajar, Prota, Promes, Jurnal)', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.supervisi.administrasi || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+
+        // 2. Absensi
+        [
+          { content: 'II', styles: { fontStyle: 'bold', halign: 'center', fillColor: [239, 246, 255], textColor: [30, 58, 138] } },
+          { content: 'KEDISIPLINAN & ABSENSI', styles: { fontStyle: 'bold', fillColor: [239, 246, 255], textColor: [30, 58, 138] } },
+          { content: '-', styles: { halign: 'center', fillColor: [239, 246, 255], textColor: [148, 163, 184] } },
+          { content: `${raporData.absensi.rataRata || '-'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [239, 246, 255], textColor: [30, 58, 138] } },
+          { content: `${raporData.absensi.rataRata >= 85 ? 'Disiplin' : 'Cukup'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [239, 246, 255], textColor: [30, 58, 138] } },
+        ],
+        [
+          { content: '2a', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Tingkat Kehadiran Jam Dinas & Mengajar', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.absensi.kehadiran || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '2b', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Ketepatan Waktu (Keterlambatan)', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.absensi.keterlambatan || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '2c', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Kedisiplinan Jam Kepulangan', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.absensi.kepulangan || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '2d', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Keikutsertaan Doa Bersama Pagi', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.absensi.doa_bersama || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '2e', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Broadcast / Share Eflyer Media Sosial Sekolah', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.absensi.share_eflayer || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+
+        // 3. Yayasan
+        [
+          { content: 'III', styles: { fontStyle: 'bold', halign: 'center', fillColor: [236, 253, 245], textColor: [6, 78, 59] } },
+          { content: 'PARTISIPASI KEGIATAN YAYASAN PONDOK DUTA', styles: { fontStyle: 'bold', fillColor: [236, 253, 245], textColor: [6, 78, 59] } },
+          { content: '-', styles: { halign: 'center', fillColor: [236, 253, 245], textColor: [148, 163, 184] } },
+          { content: `${raporData.yayasan.rataRata || '-'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [236, 253, 245], textColor: [6, 78, 59] } },
+          { content: `${raporData.yayasan.rataRata >= 85 ? 'Aktif' : 'Cukup'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [236, 253, 245], textColor: [6, 78, 59] } },
+        ],
+        [
+          { content: '3a', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Kehadiran Milad Yayasan Pondok Duta', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.yayasan.milad || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '3b', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Keaktifan Ta\'lim / Kajian Rutin Yayasan', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.yayasan.talim || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '3c', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Sosialisasi & Agenda Kegiatan Yayasan', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.yayasan.sosialisasi || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+
+        // 4. Adab
+        [
+          { content: 'IV', styles: { fontStyle: 'bold', halign: 'center', fillColor: [238, 242, 255], textColor: [49, 46, 129] } },
+          { content: `ADAB, ETIKA & KETELADANAN (${raporData.peerReviewCount} Rekan Penilai)`, styles: { fontStyle: 'bold', fillColor: [238, 242, 255], textColor: [49, 46, 129] } },
+          { content: '-', styles: { halign: 'center', fillColor: [238, 242, 255], textColor: [148, 163, 184] } },
+          { content: `${raporData.adab.rataRata || '-'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [238, 242, 255], textColor: [49, 46, 129] } },
+          { content: `${raporData.adab.rataRata >= 85 ? 'Terpuji' : 'Cukup'}`, styles: { fontStyle: 'bold', halign: 'center', fillColor: [238, 242, 255], textColor: [49, 46, 129] } },
+        ],
+        [
+          { content: '4a', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Komunikasi Kepada Pimpinan', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.komunikasi_pimpinan || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4b', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Komunikasi Kepada Siswa', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.komunikasi_siswa || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4c', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Komunikasi Kepada Orang Tua Siswa', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.komunikasi_ortu || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4d', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Komunikasi Kepada Teman Sejawat', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.komunikasi_sejawat || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4e', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Berpakaian Sesuai Ketentuan Seragam', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.seragam || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4f', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Berpakaian Sesuai Adab Islami', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.adab_pakaian || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4g', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Ketaatan Menjalankan Tugas', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.ketaatan_tugas || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+        [
+          { content: '4h', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '    • Kerapian Dandanan & Penampilan', styles: { textColor: [30, 41, 59] } },
+          { content: `${raporData.adab.dandanan || '-'}`, styles: { halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+          { content: '-', styles: { halign: 'center', textColor: [148, 163, 184] } },
+        ],
+
+        // Baris Total
+        [
+          {
+            content: 'TOTAL JUMLAH SKOR KINERJA',
+            colSpan: 2,
+            styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42] }
+          },
+          {
+            content: `${raporData.jumlah}`,
+            colSpan: 3,
+            styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [15, 23, 42], fontSize: 8.5 }
+          }
+        ],
+
+        // Baris Nilai Akhir
+        [
+          {
+            content: 'NILAI AKHIR RAPOR DIKTENDIK',
+            colSpan: 2,
+            styles: { halign: 'right', fontStyle: 'bold', fillColor: [88, 28, 135], textColor: [255, 255, 255] }
+          },
+          {
+            content: `${raporData.rata_rata}`,
+            colSpan: 2,
+            styles: { halign: 'center', fontStyle: 'bold', fillColor: [88, 28, 135], textColor: [255, 255, 255], fontSize: 9 }
+          },
+          {
+            content: `Kategori ${raporData.kategori}`,
+            colSpan: 1,
+            styles: { halign: 'center', fontStyle: 'bold', fillColor: [88, 28, 135], textColor: [253, 224, 71] }
+          }
+        ]
+      ];
+
+      autoTable(doc, {
+        head: tableHead,
+        body: tableRows,
+        startY: tableStartY,
+        theme: 'grid',
+        styles: {
+          fontSize: 6.5,
+          cellPadding: 0.95,
+          lineColor: [203, 213, 225],
+          lineWidth: 0.15,
+          textColor: [30, 41, 59],
+        },
+        headStyles: {
+          fillColor: [46, 16, 101], // purple-950
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7.2,
+          halign: 'center',
+          valign: 'middle',
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 96, halign: 'left' },
+          2: { cellWidth: 24, halign: 'center' },
+          3: { cellWidth: 26, halign: 'center' },
+          4: { cellWidth: 26, halign: 'center' },
+        },
+      });
+
+      const finalTableY = (doc as any).lastAutoTable?.finalY || 162;
+
+      // 5. CATATAN / EVALUASI PIMPINAN (Kotak Abu-Abu Rapi)
+      const noteY = finalTableY + 3.5;
+      const noteHeight = 13;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(14, noteY, pageWidth - 28, noteHeight, 2, 2, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.8);
+      doc.setTextColor(71, 85, 105);
+      doc.text('CATATAN / EVALUASI PIMPINAN:', 18, noteY + 4);
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6.8);
+      doc.setTextColor(51, 65, 85);
+      const catText = `"${raporData.catatanYayasan || 'Semoga Allah SWT senantiasa memberikan keberkahan dan kemudahan dalam menjalankan amanah mendidik generasi rabbani di SMPIT Pondok Duta.'}"`;
+      doc.text(catText, 18, noteY + 8.5, { maxWidth: pageWidth - 36 });
+
+      // 6. TANDA TANGAN RESMI KEPALA SEKOLAH
+      const signY = noteY + noteHeight + 4;
+      const colRight = pageWidth - 45;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(
+        `Depok, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+        colRight,
+        signY,
+        { align: 'center' }
+      );
+      doc.text('Kepala Sekolah,', colRight, signY + 4, { align: 'center' });
+
+      const headmasterName = config.headmaster || 'Abu Haripin, M.Pd';
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(headmasterName, colRight, signY + 16.5, { align: 'center' });
+
+      // Garis bawah nama kepala sekolah
+      const nameWidth = doc.getTextWidth(headmasterName);
+      doc.setDrawColor(15, 23, 42);
+      doc.setLineWidth(0.25);
+      doc.line(colRight - nameWidth / 2, signY + 17.5, colRight + nameWidth / 2, signY + 17.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`NIP: ${config.headmaster_nip || '03.18.10.49'}`, colRight, signY + 21, { align: 'center' });
+
+      const safeName = (selectedTeacher.nama || 'Guru').replace(/[^a-zA-Z0-9]/g, '_');
+      const safeYear = (academicYear || '2026_2027').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Rapor_Diktendik_${safeName}_${safeYear}.pdf`);
+    } catch (err) {
+      console.error('Gagal menghasilkan PDF Rapor:', err);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -265,61 +567,79 @@ export const CetakRaporTab: React.FC<CetakRaporTabProps> = ({
           </div>
         )}
 
-        {/* Print & Download buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
-          >
-            <Printer className="w-4 h-4 text-purple-300" />
-            <span>Cetak Dokumen (Print)</span>
-          </button>
-
+        {/* Tombol Unduh PDF */}
+        <div className="flex items-center">
           <button
             onClick={handleDownloadPDF}
-            className="px-4 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
+            disabled={isDownloading}
+            className="px-4 py-2.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs"
           >
-            <Download className="w-4 h-4 text-purple-200" />
-            <span>Unduh PDF Resmi</span>
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-purple-200" />
+            ) : (
+              <Download className="w-4 h-4 text-purple-200" />
+            )}
+            <span>{isDownloading ? 'Memproses PDF...' : 'Unduh PDF'}</span>
           </button>
         </div>
       </div>
 
       {/* Printable Sheet View: Styled as standard official A4 paper */}
       {selectedTeacher && raporData ? (
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 sm:p-10 max-w-4xl mx-auto print:border-none print:shadow-none print:p-0 print:m-0 text-slate-900">
-          {/* KOP SURAT RESMI */}
-          <div className="border-b-2 border-purple-900 pb-3 mb-5">
-            <div className="flex items-center justify-between gap-4">
-              {config.school_logo_url ? (
+        <div ref={sheetRef} className="bg-white rounded-3xl border border-slate-200 shadow-md p-6 sm:p-10 max-w-4xl mx-auto print:border-none print:shadow-none print:p-0 print:m-0 text-slate-900">
+          {/* KOP SURAT RESMI (Persis Standar Laporan Perangkat Pembelajaran) */}
+          <div
+            className="pb-3 text-center relative"
+            style={{
+              borderBottom: '3.5px double #0f172a',
+              marginBottom: '14px',
+            }}
+          >
+            {/* Logo Sekolah */}
+            {config.school_logo_url ? (
+              <div className="w-14 h-14 mx-auto mb-1.5 flex items-center justify-center">
                 <img
                   src={config.school_logo_url}
                   alt="Logo Sekolah"
-                  className="w-16 h-16 object-contain rounded-lg p-0.5 border border-slate-200 shrink-0"
+                  className="max-h-14 max-w-14 object-contain mx-auto"
+                  crossOrigin="anonymous"
                 />
-              ) : (
-                <div className="w-16 h-16 rounded-xl bg-purple-100 text-purple-900 font-black flex items-center justify-center text-xl shrink-0">
-                  PD
-                </div>
-              )}
-              <div className="text-center flex-1">
-                <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                  {config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA'}
-                </h3>
-                <h1 className="text-xl sm:text-2xl font-black text-purple-950 tracking-tight">
-                  {config.school_name.toUpperCase()}
-                </h1>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  {config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'} • NPSN: {config.npsn || '20276180'}
-                </p>
-                <p className="text-[10px] text-purple-700 font-bold uppercase tracking-wider">
-                  TERAKREDITASI &bull; RAPOR PENILAIAN KINERJA PENDIDIK & TENAGA KEPENDIDIKAN
-                </p>
               </div>
-              <div className="w-16 shrink-0 hidden sm:block"></div>
-            </div>
-            {/* Double decorative border line */}
-            <div className="h-0.5 bg-slate-300 mt-2"></div>
+            ) : (
+              <div
+                className="w-12 h-12 mx-auto mb-1.5 rounded-xl text-white flex items-center justify-center font-bold shadow-xs bg-blue-900"
+              >
+                <GraduationCap className="w-7 h-7 text-white" />
+              </div>
+            )}
+
+            {/* Baris 1: Yayasan Perguruan Islam Pondok Duta */}
+            <h2
+              className="font-black uppercase tracking-tight font-serif text-slate-900 text-sm sm:text-base leading-tight m-0"
+            >
+              {(config.foundation_name || 'Yayasan Perguruan Islam Pondok Duta').toUpperCase()}
+            </h2>
+
+            {/* Baris 2: Nama Sekolah */}
+            <h1
+              className="font-black uppercase tracking-wide text-blue-950 text-base sm:text-lg leading-tight my-0.5"
+            >
+              {(config.school_name || 'SMPIT PONDOK DUTA').toUpperCase()}
+            </h1>
+
+            {/* Baris 3: Alamat Sekolah */}
+            <p
+              className="font-medium text-slate-700 text-[11px] leading-tight my-0.5"
+            >
+              {config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}
+            </p>
+
+            {/* Baris 4: NPSN, Website, & Status */}
+            <p
+              className="font-mono font-semibold text-slate-600 text-[10px] leading-tight mt-0.5"
+            >
+              NPSN: {config.npsn || '20276180'} &nbsp;•&nbsp; Website: smpitpondokduta.sch.id &nbsp;•&nbsp; Status: Terakreditasi A
+            </p>
           </div>
 
           {/* DOKUMEN TITLE */}

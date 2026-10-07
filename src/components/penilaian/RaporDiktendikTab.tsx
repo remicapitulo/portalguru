@@ -211,20 +211,59 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
     const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    // Logo Sekolah jika tersedia (Terpusat di Tengah Atas mengikuti Kop Laporan Perangkat Pembelajaran)
+    if (config.school_logo_url) {
+      try {
+        doc.addImage(config.school_logo_url, 'PNG', (pageWidth - 16) / 2, 7, 16, 16);
+      } catch {
+        // Fallback
+      }
+    }
+
+    const startTextY = config.school_logo_url ? 27 : 13;
+
+    // Baris 1: Yayasan Perguruan Islam Pondok Duta
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(15, 23, 42);
-    doc.text(config.school_name.toUpperCase(), pageWidth / 2, 12, { align: 'center' });
+    doc.text((config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase(), pageWidth / 2, startTextY, { align: 'center' });
 
-    doc.setFontSize(9);
+    // Baris 2: Nama Sekolah
+    doc.setFontSize(15);
+    doc.setTextColor(23, 37, 84);
+    doc.text((config.school_name || 'SMPIT PONDOK DUTA').toUpperCase(), pageWidth / 2, startTextY + 6, { align: 'center' });
+
+    // Baris 3: Alamat Sekolah
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(`REKAPITULASI RAPOR PENILAIAN KINERJA PENDIDIK & TENAGA KEPENDIDIKAN (DIKTENDIK)`, pageWidth / 2, 17, { align: 'center' });
-    doc.text(`Tahun Ajaran: ${academicYear} • Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth / 2, 21, { align: 'center' });
+    doc.setTextColor(51, 65, 85);
+    doc.text(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat', pageWidth / 2, startTextY + 11, { align: 'center' });
 
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.5);
-    doc.line(14, 23, pageWidth - 14, 23);
+    // Baris 4: NPSN, Website, & Status
+    doc.setFontSize(8);
+    doc.setFont('courier', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`NPSN: ${config.npsn || '20276180'}  •  Website: smpitpondokduta.sch.id  •  Status: Terakreditasi A`, pageWidth / 2, startTextY + 15, { align: 'center' });
+
+    // Garis Ganda Kop Surat (borderBottom 3.5px double style)
+    const lineY = startTextY + 18;
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.8);
+    doc.line(14, lineY, pageWidth - 14, lineY);
+    doc.setLineWidth(0.3);
+    doc.line(14, lineY + 1.2, pageWidth - 14, lineY + 1.2);
+
+    // Judul Dokumen (Huruf Kapital Resmi)
+    const titleY = lineY + 7;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text('REKAPITULASI RAPOR PENILAIAN KINERJA PENDIDIK & TENAGA KEPENDIDIKAN (DIKTENDIK)', pageWidth / 2, titleY, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Tahun Pelajaran: ${academicYear}  •  Tanggal Cetak: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth / 2, titleY + 5, { align: 'center' });
 
     const headers = [
       ['No', 'Nama Guru', 'Mapel', '1. Supervisi', '2. Absensi', '3. Yayasan', '4. Adab', 'Jml', 'Nilai', 'Kat', 'Catatan']
@@ -247,18 +286,21 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
     autoTable(doc, {
       head: headers,
       body: rows,
-      startY: 26,
+      startY: titleY + 9,
       theme: 'grid',
       styles: {
         fontSize: 7.5,
         cellPadding: 2,
         halign: 'center',
         valign: 'middle',
+        textColor: [15, 23, 42],
       },
       headStyles: {
-        fillColor: [88, 28, 135],
-        textColor: 255,
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42],
         fontStyle: 'bold',
+        lineWidth: 0.2,
+        lineColor: [148, 163, 184],
       },
       columnStyles: {
         1: { halign: 'left' },
@@ -269,6 +311,37 @@ export const RaporDiktendikTab: React.FC<RaporDiktendikTabProps> = ({
         fillColor: [250, 245, 255],
       },
     });
+
+    const finalTableY = (doc as any).lastAutoTable?.finalY || 160;
+    const signY = finalTableY + 8;
+    const colRight = pageWidth - 45;
+
+    // Periksa bila butuh halaman baru
+    if (signY + 28 > doc.internal.pageSize.getHeight()) {
+      doc.addPage();
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Depok, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`, colRight, signY, { align: 'center' });
+    doc.text('Kepala Sekolah,', colRight, signY + 4.5, { align: 'center' });
+
+    const headmasterName = config.headmaster || 'Abu Haripin, M.Pd';
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(headmasterName, colRight, signY + 18, { align: 'center' });
+
+    const nameWidth = doc.getTextWidth(headmasterName);
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.25);
+    doc.line(colRight - nameWidth / 2, signY + 19, colRight + nameWidth / 2, signY + 19);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`NIP: ${config.headmaster_nip || '03.18.10.49'}`, colRight, signY + 23, { align: 'center' });
 
     doc.save(`Rekap_Rapor_Diktendik_SMPIT_Pondok_Duta_${academicYear.replace('/', '_')}.pdf`);
   };

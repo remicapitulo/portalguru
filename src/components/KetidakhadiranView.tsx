@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   CalendarX,
   PlusCircle,
+  GraduationCap,
   FileSpreadsheet,
   CheckCircle2,
   Clock,
@@ -9,7 +10,6 @@ import {
   Search,
   Filter,
   Download,
-  Printer,
   Calendar,
   UserCheck,
   Stethoscope,
@@ -244,6 +244,74 @@ export const KetidakhadiranView: React.FC<KetidakhadiranViewProps> = ({
       isCurrent: key === curYM
     }));
   }, [NAMA_BULAN, ketidakhadiranList]);
+
+  // Filter Unduh Laporan PDF (Bulanan atau Tahunan)
+  const [cetakMode, setCetakMode] = useState<'bulanan' | 'tahunan'>('bulanan');
+  const [cetakTahun, setCetakTahun] = useState<number>(() => new Date().getFullYear());
+  const [cetakBulan, setCetakBulan] = useState<number>(() => new Date().getMonth() + 1);
+  const [cetakBulanAwal, setCetakBulanAwal] = useState<number>(1); // Januari
+  const [cetakBulanAkhir, setCetakBulanAkhir] = useState<number>(12); // Desember
+
+  // Daftar tahun untuk filter laporan
+  const availableYearsCetak = useMemo(() => {
+    const yearsSet = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    yearsSet.add(currentYear);
+    yearsSet.add(currentYear - 1);
+    yearsSet.add(currentYear + 1);
+
+    ketidakhadiranList.forEach((item) => {
+      if (item.tanggal_awal) {
+        const y = parseInt(item.tanggal_awal.split('-')[0], 10);
+        if (!isNaN(y) && y >= 2020 && y <= 2035) {
+          yearsSet.add(y);
+        }
+      }
+    });
+
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  }, [ketidakhadiranList]);
+
+  // Label periode untuk subjudul dokumen laporan PDF
+  const periodeLabelDoc = useMemo(() => {
+    if (cetakMode === 'bulanan') {
+      const monthName = NAMA_BULAN[cetakBulan - 1] || `Bulan ${cetakBulan}`;
+      return `Bulan: ${monthName} ${cetakTahun}`;
+    }
+    // Mode tahunan: menampilkan rentang bulan awal dan bulan akhir
+    const minM = Math.min(cetakBulanAwal, cetakBulanAkhir);
+    const maxM = Math.max(cetakBulanAwal, cetakBulanAkhir);
+    const startName = NAMA_BULAN[minM - 1] || `Bulan ${minM}`;
+    const endName = NAMA_BULAN[maxM - 1] || `Bulan ${maxM}`;
+    if (minM === 1 && maxM === 12) {
+      return `Tahun ${cetakTahun} (Januari – Desember)`;
+    }
+    return `Periode: ${startName} – ${endName} ${cetakTahun}`;
+  }, [cetakMode, cetakBulan, cetakTahun, cetakBulanAwal, cetakBulanAkhir, NAMA_BULAN]);
+
+  // Data terfilter khusus untuk lembar Unduh Laporan PDF
+  const filteredCetakList = useMemo(() => {
+    return ketidakhadiranList.filter((item) => {
+      if (!item.tanggal_awal) return false;
+      const parts = item.tanggal_awal.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      if (isNaN(y) || isNaN(m)) return false;
+
+      // Filter Tahun
+      if (y !== cetakTahun) return false;
+
+      // Filter Bulan
+      if (cetakMode === 'bulanan') {
+        return m === cetakBulan;
+      } else {
+        // Mode tahunan: disaring berdasarkan bulan awal dan bulan akhir
+        const minM = Math.min(cetakBulanAwal, cetakBulanAkhir);
+        const maxM = Math.max(cetakBulanAwal, cetakBulanAkhir);
+        return m >= minM && m <= maxM;
+      }
+    }).sort((a, b) => (a.tanggal_awal || '').localeCompare(b.tanggal_awal || ''));
+  }, [ketidakhadiranList, cetakTahun, cetakMode, cetakBulan, cetakBulanAwal, cetakBulanAkhir]);
 
   // Route-guard: Tutup sub-menu Realisasi di Spreadsheet dari akun Guru (hanya Admin/TU yang dapat membuka)
   useEffect(() => {
@@ -910,55 +978,65 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Logo Sekolah jika tersedia
+    // Logo Sekolah jika tersedia (Terpusat di Tengah Atas mengikuti Kop Laporan Perangkat Pembelajaran)
     if (config.school_logo_url) {
       try {
-        doc.addImage(config.school_logo_url, 'PNG', 14, 10, 22, 22);
+        doc.addImage(config.school_logo_url, 'PNG', (pageWidth - 16) / 2, 7, 16, 16);
       } catch {
         // Fallback jika format atau cross-origin tidak mendukung addImage
       }
     }
 
-    // Kop Surat (Persis Rapor Penilaian Kinerja Diktendik)
+    const startTextY = config.school_logo_url ? 27 : 13;
+
+    // Baris 1: Yayasan Perguruan Islam Pondok Duta
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(15, 23, 42);
-    doc.text((config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase(), pageWidth / 2, 14, { align: 'center' });
+    doc.text((config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase(), pageWidth / 2, startTextY, { align: 'center' });
 
+    // Baris 2: Nama Sekolah
     doc.setFontSize(15);
-    doc.setTextColor(88, 28, 135);
-    doc.text((config.school_name || 'SMPIT PONDOK DUTA').toUpperCase(), pageWidth / 2, 21, { align: 'center' });
+    doc.setTextColor(23, 37, 84);
+    doc.text((config.school_name || 'SMPIT PONDOK DUTA').toUpperCase(), pageWidth / 2, startTextY + 6, { align: 'center' });
 
+    // Baris 3: Alamat Sekolah
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    doc.text(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat', pageWidth / 2, startTextY + 11, { align: 'center' });
+
+    // Baris 4: NPSN, Website, & Status
+    doc.setFontSize(8);
+    doc.setFont('courier', 'normal');
     doc.setTextColor(71, 85, 105);
-    doc.text(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat', pageWidth / 2, 26, { align: 'center' });
-    doc.text(`NPSN: ${config.npsn || '20276180'} • Status Terakreditasi "A"`, pageWidth / 2, 30, { align: 'center' });
+    doc.text(`NPSN: ${config.npsn || '20276180'}  •  Website: smpitpondokduta.sch.id  •  Status: Terakreditasi A`, pageWidth / 2, startTextY + 15, { align: 'center' });
 
-    // Garis Ganda Kop Surat
-    doc.setDrawColor(88, 28, 135);
-    doc.setLineWidth(1);
-    doc.line(14, 33, pageWidth - 14, 33);
-    doc.setDrawColor(203, 213, 225);
-    doc.setLineWidth(0.4);
-    doc.line(14, 34.2, pageWidth - 14, 34.2);
+    // Garis Ganda Kop Surat (borderBottom 3.5px double style)
+    const lineY = startTextY + 18;
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.8);
+    doc.line(14, lineY, pageWidth - 14, lineY);
+    doc.setLineWidth(0.3);
+    doc.line(14, lineY + 1.2, pageWidth - 14, lineY + 1.2);
 
-    // Judul
+    // Judul Dokumen (Huruf Kapital Resmi Bergaris Bawah)
+    const titleY = lineY + 7;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(15, 23, 42);
-    doc.text('REKAPITULASI DAFTAR KETIDAKHADIRAN GURU & TENAGA KEPENDIDIKAN', pageWidth / 2, 42, { align: 'center' });
+    doc.text('REKAPITULASI DAFTAR KETIDAKHADIRAN GURU & TENAGA KEPENDIDIKAN', pageWidth / 2, titleY, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Tahun Pelajaran: ${config.academic_year || '2026/2027'}  •  Total Catatan: ${displayList.length} Izin/Sakit/Tugas`, pageWidth / 2, 47, { align: 'center' });
+    doc.text(`${periodeLabelDoc}  •  Total Catatan: ${filteredCetakList.length} Guru`, pageWidth / 2, titleY + 5, { align: 'center' });
 
-    const rows = displayList.map((item, idx) => [
+    const rows = filteredCetakList.map((item, idx) => [
       String(idx + 1),
       item.tanggal_awal === item.tanggal_akhir || !item.tanggal_akhir
         ? item.tanggal_awal
-        : `${item.tanggal_awal} s.d ${item.tanggal_akhir}`,
+        : `${item.tanggal_awal}\ns.d ${item.tanggal_akhir}`,
       item.nama,
       item.mapel || '-',
       item.jenis,
@@ -971,22 +1049,22 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     ]);
 
     autoTable(doc, {
-      startY: 52,
+      startY: titleY + 9,
       head: [['No', 'Tanggal', 'Nama Guru / Tendik', 'Mapel', 'Jenis', 'Ada Surat', 'Keterangan / Alasan', 'Guru Pengganti (Inval)', 'Status']],
       body: rows,
       theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 2.5 },
-      headStyles: { fillColor: [88, 28, 135], textColor: 255, fontStyle: 'bold', halign: 'center' },
+      styles: { fontSize: 8.5, cellPadding: 2.5, textColor: [15, 23, 42] },
+      headStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', halign: 'center', lineWidth: 0.2, lineColor: [148, 163, 184] },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
-        1: { halign: 'center', cellWidth: 30 },
-        2: { cellWidth: 44 },
-        3: { cellWidth: 26 },
-        4: { halign: 'center', cellWidth: 20 },
-        5: { halign: 'center', cellWidth: 22 },
-        6: { cellWidth: 55 },
-        7: { cellWidth: 33 },
-        8: { halign: 'center', cellWidth: 24 }
+        1: { halign: 'center', cellWidth: 26 },
+        2: { cellWidth: 42 },
+        3: { cellWidth: 22 },
+        4: { halign: 'center', cellWidth: 18 },
+        5: { halign: 'center', cellWidth: 20 },
+        6: { cellWidth: 78 },
+        7: { cellWidth: 32 },
+        8: { halign: 'center', cellWidth: 20 }
       }
     });
 
@@ -1005,7 +1083,8 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     doc.setFont('helvetica', 'normal');
     doc.text(`NIP: ${config.headmaster_nip || '03.18.10.49'}`, colRight, signY + 28, { align: 'center' });
 
-    doc.save(`Rekap_Ketidakhadiran_SMPIT_Pondok_Duta_${(config.academic_year || '2026_2027').replace('/', '_')}.pdf`);
+    const safePeriode = periodeLabelDoc.replace(/[^a-zA-Z0-9]/g, '_');
+    doc.save(`Laporan_Ketidakhadiran_SMPIT_Pondok_Duta_${safePeriode}.pdf`);
   };
 
   return (
@@ -1022,7 +1101,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                 Menu Utama Portal Guru
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-slate-300">
-                Tahun Ajaran {config.academic_year}
+                Periode Bulan {NAMA_BULAN[new Date().getMonth()]} {new Date().getFullYear()}
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5">
@@ -1310,18 +1389,18 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
           {/* DESKTOP TABLE VIEW (Tampil pada layar md ke atas) */}
           <div className="hidden md:block bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[840px]">
+              <table className="w-full text-left border-collapse min-w-[1080px]">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase text-slate-600 tracking-wider">
                     <th className="py-3.5 px-4 w-12 text-center">No</th>
-                    <th className="py-3.5 px-4 w-36">Tanggal</th>
-                    <th className="py-3.5 px-4">Nama Guru / Tendik</th>
-                    <th className="py-3.5 px-4 w-28 text-center">Jenis</th>
-                    <th className="py-3.5 px-4">Keterangan / Alasan</th>
-                    <th className="py-3.5 px-4 w-32 text-center">Ada Surat?</th>
-                    <th className="py-3.5 px-4 w-40">Guru Pengganti (Inval)</th>
-                    <th className="py-3.5 px-4 w-32 text-center">Status</th>
-                    <th className="py-3.5 px-4 w-36 text-center sticky right-0 bg-slate-100/95 sm:bg-slate-100 z-10 border-l border-slate-200 shadow-[-4px_0_8px_rgba(0,0,0,0.03)]">
+                    <th className="py-3.5 px-4 min-w-[140px] whitespace-nowrap">Tanggal</th>
+                    <th className="py-3.5 px-4 min-w-[220px]">Nama Guru / Tendik</th>
+                    <th className="py-3.5 px-4 w-28 text-center whitespace-nowrap">Jenis</th>
+                    <th className="py-3.5 px-4 min-w-[180px]">Keterangan / Alasan</th>
+                    <th className="py-3.5 px-4 w-36 text-center whitespace-nowrap">Ada Surat?</th>
+                    <th className="py-3.5 px-4 min-w-[180px] whitespace-nowrap">Guru Pengganti (Inval)</th>
+                    <th className="py-3.5 px-4 w-32 text-center whitespace-nowrap">Status</th>
+                    <th className="py-3.5 px-4 w-36 text-center sticky right-0 bg-slate-100/95 sm:bg-slate-100 z-10 border-l border-slate-200 shadow-[-4px_0_8px_rgba(0,0,0,0.03)] whitespace-nowrap">
                       Aksi
                     </th>
                   </tr>
@@ -1340,21 +1419,24 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
                           <td className="py-3.5 px-4 text-center font-bold text-slate-400">{index + 1}</td>
-                          <td className="py-3.5 px-4 font-mono font-medium text-slate-700">
+                          <td className="py-3.5 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
                             {isSingleDay ? (
-                              <span>{item.tanggal_awal}</span>
+                              <span className="font-semibold text-slate-800">{item.tanggal_awal}</span>
                             ) : (
-                              <div className="space-y-0.5">
-                                <span>{item.tanggal_awal}</span>
-                                <span className="block text-[10px] text-slate-400 font-sans">s.d {item.tanggal_akhir}</span>
+                              <div className="flex flex-col whitespace-nowrap">
+                                <span className="font-semibold text-slate-800">{item.tanggal_awal}</span>
+                                <span className="text-[10px] text-slate-400 font-sans">s.d {item.tanggal_akhir}</span>
                               </div>
                             )}
                           </td>
-                          <td className="py-3.5 px-4">
-                            <strong className="block font-bold text-slate-900">{item.nama}</strong>
-                            <span className="text-[11px] text-slate-500 font-mono">
-                              NIP: {item.nip} {item.mapel ? `• ${item.mapel}` : ''}
-                            </span>
+                          <td className="py-3.5 px-4 min-w-[220px]">
+                            <strong className="block font-bold text-slate-900 text-[13px] leading-snug whitespace-nowrap">
+                              {item.nama}
+                            </strong>
+                            <div className="text-[11px] text-slate-500 font-mono mt-0.5 whitespace-nowrap flex items-center gap-1.5">
+                              <span>NIP: {item.nip}</span>
+                              {item.mapel && <span className="text-slate-400 font-sans">• {item.mapel}</span>}
+                            </div>
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             <span
@@ -1364,65 +1446,45 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 max-w-xs">
-                            <p className="line-clamp-2 leading-relaxed text-slate-700">{item.keterangan}</p>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                              {item.kelas_terdampak && (
+                            <p className="line-clamp-2 leading-relaxed text-slate-700">{item.keterangan || '-'}</p>
+                            {item.kelas_terdampak && (
+                              <div className="mt-1">
                                 <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-medium">
                                   Kelas: {item.kelas_terdampak}
                                 </span>
-                              )}
-                              {item.surat_bukti_url && (
+                              </div>
+                            )}
+                          </td>
+                          {/* KOLOM ADA SURAT / TIDAK (Hanya 1 link bukti di kolom ini) */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {hasSurat ? (
+                              item.surat_bukti_url ? (
                                 <button
                                   type="button"
                                   onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
-                                  className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/90 px-2 py-0.5 rounded-lg transition shadow-2xs group/link cursor-pointer"
-                                  title={item.surat_bukti_name ? `Buka berkas file: ${item.surat_bukti_name}` : "Buka Berkas Bukti Surat"}
-                                >
-                                  <FileText className="w-3.5 h-3.5 text-purple-600 group-hover/link:scale-110 transition-transform" />
-                                  <span className="truncate max-w-[130px]">{item.surat_bukti_name || 'Berkas Bukti'}</span>
-                                  <ExternalLink className="w-3 h-3 text-purple-400 group-hover/link:text-purple-700" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                          {/* KOLOM ADA SURAT / TIDAK */}
-                          <td className="py-3.5 px-4 text-center">
-                            {hasSurat ? (
-                              <div className="inline-flex flex-col items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => hasFullAccess ? handleOpenStatusModal(item) : undefined}
-                                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 transition ${
-                                    hasFullAccess ? 'hover:bg-emerald-200 cursor-pointer shadow-2xs' : ''
-                                  }`}
-                                  title={hasFullAccess ? "Klik untuk ubah status & kelengkapan surat" : "Surat / Bukti Resmi Tersedia"}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-all shadow-2xs cursor-pointer group active:scale-95"
+                                  title={item.surat_bukti_name ? `Buka berkas file: ${item.surat_bukti_name}` : "Klik untuk buka berkas bukti surat"}
                                 >
                                   <FileCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                   <span>Ada Surat</span>
+                                  <ExternalLink className="w-3 h-3 text-emerald-500 group-hover:text-emerald-700 shrink-0" />
                                 </button>
-                                {item.surat_bukti_url && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
-                                    className="inline-flex items-center gap-1 text-[10px] text-purple-700 hover:text-purple-900 font-semibold underline cursor-pointer"
-                                    title="Buka Berkas Bukti"
-                                  >
-                                    <span>Berkas</span>
-                                    <ExternalLink className="w-2.5 h-2.5" />
-                                  </button>
-                                )}
-                              </div>
+                              ) : (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  title="Ada Surat / Izin Resmi Tercatat"
+                                >
+                                  <FileCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>Ada Surat</span>
+                                </span>
+                              )
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => hasFullAccess ? handleOpenStatusModal(item) : undefined}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-slate-100 text-slate-500 border border-slate-200 transition ${
-                                  hasFullAccess ? 'hover:bg-slate-200 hover:text-slate-800 cursor-pointer shadow-2xs' : ''
-                                }`}
-                                title={hasFullAccess ? "Klik untuk isi kelengkapan surat & ubah status" : "Belum Ada Berkas Surat"}
+                              <span
+                                className="inline-flex items-center px-2.5 py-1 rounded-full text-[10.5px] font-medium bg-slate-100 text-slate-500 border border-slate-200"
+                                title="Belum Ada Berkas Surat"
                               >
-                                <span>Tidak Ada</span>
-                              </button>
+                                Tidak Ada
+                              </span>
                             )}
                           </td>
                           <td className="py-3.5 px-4">
@@ -1614,22 +1676,25 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
                         <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between gap-1">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Ada Surat?</span>
                           {hasSurat ? (
-                            <div className="flex items-center justify-between gap-1">
+                            item.surat_bukti_url ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
+                                className="inline-flex items-center justify-between gap-1 p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-200 transition cursor-pointer w-full"
+                                title="Buka berkas bukti surat"
+                              >
+                                <span className="inline-flex items-center gap-1">
+                                  <FileCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                  <span>Ada Surat</span>
+                                </span>
+                                <ExternalLink className="w-3 h-3 text-emerald-600 shrink-0" />
+                              </button>
+                            ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800">
                                 <FileCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                 <span>Ada Surat</span>
                               </span>
-                              {item.surat_bukti_url && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenBukti(item.surat_bukti_url, item.surat_bukti_name)}
-                                  className="p-1 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 text-[10px] transition cursor-pointer"
-                                  title="Buka Berkas Bukti"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
+                            )
                           ) : (
                             <span className="text-[11px] font-semibold text-slate-500">Tidak Ada</span>
                           )}
@@ -2116,7 +2181,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                <Download className="w-5 h-5 text-indigo-600" />
+                <Download className="w-5 h-5 text-purple-700" />
                 <span>Rekapitulasi Ketidakhadiran &amp; Unduh Laporan Resmi</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
@@ -2126,13 +2191,7 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() => window.print()}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
-              >
-                <Printer className="w-4 h-4 text-slate-300" />
-                <span>Cetak Dokumen</span>
-              </button>
-              <button
+                type="button"
                 onClick={handleExportPDF}
                 className="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
               >
@@ -2142,40 +2201,191 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
             </div>
           </div>
 
+          {/* BAR FILTER BULANAN / TAHUNAN UNTUK UNDUH LAPORAN PDF */}
+          <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-50/70 via-slate-50 to-indigo-50/70 rounded-2xl border border-purple-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Pilihan Format: Bulanan vs Tahunan */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                  Format Laporan
+                </label>
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setCetakMode('bulanan')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      cetakMode === 'bulanan'
+                        ? 'bg-purple-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    Laporan Bulanan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCetakMode('tahunan');
+                      // Pastikan default 1 tahun penuh Jan - Des
+                      setCetakBulanAwal(1);
+                      setCetakBulanAkhir(12);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      cetakMode === 'tahunan'
+                        ? 'bg-purple-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                  >
+                    Laporan Tahunan
+                  </button>
+                </div>
+              </div>
+
+              {/* Pilih Tahun */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                  Pilih Tahun
+                </label>
+                <select
+                  value={cetakTahun}
+                  onChange={(e) => setCetakTahun(parseInt(e.target.value, 10))}
+                  className="px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:border-purple-600 outline-none cursor-pointer shadow-2xs"
+                >
+                  {availableYearsCetak.map((yr) => (
+                    <option key={yr} value={yr}>
+                      Tahun {yr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Mode Bulanan: Dropdown Pilih 1 Bulan */}
+              {cetakMode === 'bulanan' && (
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                    Pilih Bulan
+                  </label>
+                  <select
+                    value={cetakBulan}
+                    onChange={(e) => setCetakBulan(parseInt(e.target.value, 10))}
+                    className="px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:border-purple-600 outline-none cursor-pointer shadow-2xs"
+                  >
+                    {NAMA_BULAN.map((m, idx) => (
+                      <option key={m} value={idx + 1}>
+                        Bulan {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Mode Tahunan: Bulan Awal & Bulan Akhir Dimunculkan */}
+              {cetakMode === 'tahunan' && (
+                <div className="flex items-center gap-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                      Bulan Awal
+                    </label>
+                    <select
+                      value={cetakBulanAwal}
+                      onChange={(e) => setCetakBulanAwal(parseInt(e.target.value, 10))}
+                      className="px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:border-purple-600 outline-none cursor-pointer shadow-2xs"
+                    >
+                      {NAMA_BULAN.map((m, idx) => (
+                        <option key={m} value={idx + 1}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="self-end pb-2.5 text-xs font-bold text-slate-400">s.d</span>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                      Bulan Akhir
+                    </label>
+                    <select
+                      value={cetakBulanAkhir}
+                      onChange={(e) => setCetakBulanAkhir(parseInt(e.target.value, 10))}
+                      className="px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:border-purple-600 outline-none cursor-pointer shadow-2xs"
+                    >
+                      {NAMA_BULAN.map((m, idx) => (
+                        <option key={m} value={idx + 1}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Total Ringkasan Data */}
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <span className="text-[11px] font-semibold text-slate-500 block">
+                  Total Data Terfilter:
+                </span>
+                <span className="text-sm font-black text-purple-900">
+                  {filteredCetakList.length} Catatan Guru
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* DOKUMEN CETAK PREVIEW */}
-          <div className="border border-slate-300 rounded-2xl p-6 sm:p-8 bg-white space-y-6 text-slate-900 print:border-none print:p-0">
-            {/* KOP SURAT RESMI (Persis Rapor Penilaian Kinerja Diktendik) */}
-            <div className="border-b-2 border-purple-900 pb-3 mb-5">
-              <div className="flex items-center justify-between gap-4">
-                {config.school_logo_url ? (
+          <div className="border border-slate-300 rounded-3xl p-6 sm:p-10 bg-white space-y-6 text-slate-900 shadow-md print:border-none print:p-0">
+            {/* KOP SURAT RESMI (Persis Standar Laporan Perangkat Pembelajaran) */}
+            <div
+              className="pb-3 text-center relative"
+              style={{
+                borderBottom: '3.5px double #0f172a',
+                marginBottom: '14px',
+              }}
+            >
+              {/* Logo Sekolah */}
+              {config.school_logo_url ? (
+                <div className="w-14 h-14 mx-auto mb-1.5 flex items-center justify-center">
                   <img
                     src={config.school_logo_url}
                     alt="Logo Sekolah"
-                    className="w-16 h-16 object-contain rounded-lg p-0.5 border border-slate-200 shrink-0"
+                    className="max-h-14 max-w-14 object-contain mx-auto"
+                    crossOrigin="anonymous"
                   />
-                ) : (
-                  <div className="w-16 h-16 rounded-xl bg-purple-100 text-purple-900 font-black flex items-center justify-center text-xl shrink-0">
-                    PD
-                  </div>
-                )}
-                <div className="text-center flex-1">
-                  <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    {(config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase()}
-                  </h3>
-                  <h1 className="text-xl sm:text-2xl font-black text-purple-950 tracking-tight">
-                    {(config.school_name || 'SMPIT PONDOK DUTA').toUpperCase()}
-                  </h1>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'} • NPSN: {config.npsn || '20276180'}
-                  </p>
-                  <p className="text-[10px] text-purple-700 font-bold uppercase tracking-wider">
-                    TERAKREDITASI &bull; RAPOR PENILAIAN KINERJA PENDIDIK &amp; TENAGA KEPENDIDIKAN
-                  </p>
                 </div>
-                <div className="w-16 shrink-0 hidden sm:block"></div>
-              </div>
-              {/* Double decorative border line */}
-              <div className="h-0.5 bg-slate-300 mt-2"></div>
+              ) : (
+                <div
+                  className="w-12 h-12 mx-auto mb-1.5 rounded-xl text-white flex items-center justify-center font-bold shadow-xs bg-blue-900"
+                >
+                  <GraduationCap className="w-7 h-7 text-white" />
+                </div>
+              )}
+
+              {/* Baris 1: Yayasan Perguruan Islam Pondok Duta */}
+              <h2
+                className="font-black uppercase tracking-tight font-serif text-slate-900 text-sm sm:text-base leading-tight m-0"
+              >
+                {(config.foundation_name || 'Yayasan Perguruan Islam Pondok Duta').toUpperCase()}
+              </h2>
+
+              {/* Baris 2: Nama Sekolah */}
+              <h1
+                className="font-black uppercase tracking-wide text-blue-950 text-base sm:text-lg leading-tight my-0.5"
+              >
+                {(config.school_name || 'SMPIT PONDOK DUTA').toUpperCase()}
+              </h1>
+
+              {/* Baris 3: Alamat Sekolah */}
+              <p
+                className="font-medium text-slate-700 text-[11px] leading-tight my-0.5"
+              >
+                {config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'}
+              </p>
+
+              {/* Baris 4: NPSN, Website, & Status */}
+              <p
+                className="font-mono font-semibold text-slate-600 text-[10px] leading-tight mt-0.5"
+              >
+                NPSN: {config.npsn || '20276180'} &nbsp;•&nbsp; Website: smpitpondokduta.sch.id &nbsp;•&nbsp; Status: Terakreditasi A
+              </p>
             </div>
 
             {/* JUDUL DOKUMEN */}
@@ -2183,8 +2393,8 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
               <h3 className="text-sm sm:text-base font-black uppercase text-slate-900 underline underline-offset-4">
                 REKAPITULASI DAFTAR KETIDAKHADIRAN GURU & TENAGA KEPENDIDIKAN
               </h3>
-              <p className="text-xs text-slate-600">
-                Tahun Ajaran {config.academic_year || '2026/2027'}
+              <p className="text-xs text-slate-600 font-semibold">
+                {periodeLabelDoc}
               </p>
             </div>
 
@@ -2193,39 +2403,54 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
               <table className="w-full text-left border-collapse border border-slate-300 text-xs">
                 <thead>
                   <tr className="bg-slate-100 font-bold text-slate-800 border-b border-slate-300">
-                    <th className="py-2.5 px-3 border border-slate-300 text-center w-10">No</th>
-                    <th className="py-2.5 px-3 border border-slate-300 w-32 text-center">Tanggal</th>
-                    <th className="py-2.5 px-3 border border-slate-300">Nama Guru / Tendik</th>
-                    <th className="py-2.5 px-3 border border-slate-300 text-center w-24">Jenis</th>
-                    <th className="py-2.5 px-3 border border-slate-300 text-center w-24">Ada Surat</th>
-                    <th className="py-2.5 px-3 border border-slate-300">Keterangan / Alasan</th>
-                    <th className="py-2.5 px-3 border border-slate-300 w-36">Inval (Guru Pengganti)</th>
-                    <th className="py-2.5 px-3 border border-slate-300 text-center w-24">Status</th>
+                    <th className="py-2.5 px-2 border border-slate-300 text-center w-10 font-bold">No</th>
+                    <th className="py-2.5 px-3 border border-slate-300 w-28 text-center whitespace-nowrap">Tanggal</th>
+                    <th className="py-2.5 px-3 border border-slate-300 min-w-[170px] whitespace-nowrap">Nama Guru / Tendik</th>
+                    <th className="py-2.5 px-2.5 border border-slate-300 text-center w-20 whitespace-nowrap">Jenis</th>
+                    <th className="py-2.5 px-2.5 border border-slate-300 text-center w-24 whitespace-nowrap">Ada Surat</th>
+                    <th className="py-2.5 px-4 border border-slate-300 min-w-[260px]">Keterangan / Alasan</th>
+                    <th className="py-2.5 px-3 border border-slate-300 w-36 text-center whitespace-nowrap">Inval (Guru Pengganti)</th>
+                    <th className="py-2.5 px-3 border border-slate-300 text-center w-24 whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {displayList.map((item, idx) => (
-                    <tr key={item.id} className="border-b border-slate-200">
-                      <td className="py-2 px-3 text-center border border-slate-300 font-mono">{idx + 1}</td>
-                      <td className="py-2 px-3 text-center border border-slate-300 font-mono text-[11px]">
-                        {item.tanggal_awal === item.tanggal_akhir || !item.tanggal_akhir
-                          ? item.tanggal_awal
-                          : `${item.tanggal_awal} s.d ${item.tanggal_akhir}`}
-                      </td>
-                      <td className="py-2 px-3 border border-slate-300 font-bold">{item.nama}</td>
-                      <td className="py-2 px-3 border border-slate-300 text-center font-semibold">{item.jenis}</td>
-                      <td className="py-2 px-3 border border-slate-300 text-center font-bold text-slate-700">
-                        {item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat)
-                          ? 'Ada Surat'
-                          : 'Tidak Ada'}
-                      </td>
-                      <td className="py-2 px-3 border border-slate-300">{item.keterangan}</td>
-                      <td className="py-2 px-3 border border-slate-300">{item.inval_guru || '-'}</td>
-                      <td className="py-2 px-3 border border-slate-300 text-center font-bold text-emerald-800">
-                        {item.status}
+                  {filteredCetakList.length > 0 ? (
+                    filteredCetakList.map((item, idx) => (
+                      <tr key={item.id} className="border-b border-slate-200">
+                        <td className="py-2.5 px-2 text-center border border-slate-300 font-mono font-bold text-slate-500">{idx + 1}</td>
+                        <td className="py-2.5 px-3 text-center border border-slate-300 font-mono text-[11px] whitespace-nowrap w-28">
+                          {item.tanggal_awal === item.tanggal_akhir || !item.tanggal_akhir ? (
+                            <span>{item.tanggal_awal}</span>
+                          ) : (
+                            <div className="flex flex-col items-center leading-snug">
+                              <span>{item.tanggal_awal}</span>
+                              <span className="text-[10.5px] text-slate-500 font-sans">s.d {item.tanggal_akhir}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 border border-slate-300 font-bold text-slate-900 whitespace-nowrap">{item.nama}</td>
+                        <td className="py-2.5 px-2.5 border border-slate-300 text-center font-semibold text-slate-800 whitespace-nowrap">{item.jenis}</td>
+                        <td className="py-2.5 px-2.5 border border-slate-300 text-center font-bold text-slate-700 whitespace-nowrap">
+                          {item.ada_surat === 'Ada Surat' || item.ada_surat === 'Ada' || (item.surat_bukti_url && !item.ada_surat)
+                            ? 'Ada Surat'
+                            : 'Tidak Ada'}
+                        </td>
+                        <td className="py-2.5 px-4 border border-slate-300 leading-relaxed text-slate-800 min-w-[260px]">
+                          {item.keterangan || '-'}
+                        </td>
+                        <td className="py-2.5 px-3 border border-slate-300 text-center whitespace-nowrap text-slate-700">{item.inval_guru || '-'}</td>
+                        <td className="py-2.5 px-3 border border-slate-300 text-center font-bold text-emerald-800 whitespace-nowrap">
+                          {item.status}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                        Tidak ada catatan ketidakhadiran pada {periodeLabelDoc.toLowerCase()}.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
