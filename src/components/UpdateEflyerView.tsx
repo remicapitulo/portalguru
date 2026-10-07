@@ -620,12 +620,12 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
 
             <button
               onClick={handleRefresh}
-              disabled={refreshing}
+              disabled={refreshing || loading}
               className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-xs border border-white/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
               title="Sinkronkan data dengan Google Spreadsheet"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-fuchsia-400' : 'text-sky-300'}`} />
-              <span>{refreshing ? 'Menyinkronkan...' : 'Sinkronkan Sheet'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing || loading ? 'animate-spin text-fuchsia-400' : 'text-sky-300'}`} />
+              <span>{refreshing || loading ? 'Menyinkronkan...' : 'Sinkronkan Sheet'}</span>
             </button>
           </div>
         </div>
@@ -654,15 +654,31 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
           >
             <Award className="w-4 h-4 text-amber-500 shrink-0" />
             <span>Laporan / Progres</span>
-            <span
-              className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 transition-colors ${
-                activeTab === 'progress'
-                  ? 'bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300'
-                  : 'bg-fuchsia-950/70 text-fuchsia-200 border border-fuchsia-500/40'
-              }`}
-            >
-              {reports.length} Data
-            </span>
+            {(loading || refreshing) && reports.length === 0 ? (
+              <span
+                className={`ml-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'progress'
+                    ? 'bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300'
+                    : 'bg-fuchsia-950/80 text-fuchsia-200 border border-fuchsia-500/50'
+                }`}
+              >
+                <RefreshCw className="w-2.5 h-2.5 animate-spin text-fuchsia-400 shrink-0" />
+                <span>Sedang Ambil Data...</span>
+              </span>
+            ) : (
+              <span
+                className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 transition-colors flex items-center gap-1.5 ${
+                  activeTab === 'progress'
+                    ? 'bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300'
+                    : 'bg-fuchsia-950/70 text-fuchsia-200 border border-fuchsia-500/40'
+                }`}
+              >
+                {(loading || refreshing) && (
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin text-fuchsia-400 shrink-0" />
+                )}
+                <span>{reports.length} Data</span>
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -1109,8 +1125,43 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
       {/* ============================================================== */}
       {activeTab === 'progress' && (
         <div className="space-y-6">
-          {/* Controls Bar: Year Selection, Admin View Switcher, and Export PDF */}
-          <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* TAMPILAN ANIMASI SINKRONISASI / AMBIL DATA JIKA DATA MASIH 0 */}
+          {(loading || refreshing) && reports.length === 0 ? (
+            <div className="bg-white rounded-3xl border border-blue-200/80 p-8 sm:p-14 shadow-sm text-center flex flex-col items-center justify-center space-y-4 animate-in fade-in">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-50 to-indigo-100 border border-blue-200 flex items-center justify-center shadow-xs">
+                  <RefreshCw className="w-8 h-8 text-blue-600 animate-spin" />
+                </div>
+                <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-600"></span>
+                </span>
+              </div>
+              <div className="space-y-2 max-w-md">
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  Sedang Proses Mengambil Data...
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Sistem sedang menghubungkan dan menyinkronkan data dari <strong>Google Spreadsheet</strong>. Mohon tunggu beberapa saat, data akan otomatis muncul setelah proses selesai.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-xs font-semibold text-blue-800">
+                <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
+                <span>Sinkronisasi aktif ke cloud Google Spreadsheet...</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Notifikasi proses sinkronisasi background jika data sudah ada */}
+              {(loading || refreshing) && reports.length > 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold text-blue-800 animate-pulse">
+                  <RefreshCw className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                  <span>Sedang memperbarui &amp; menyinkronkan data dari Google Spreadsheet...</span>
+                </div>
+              )}
+
+              {/* Controls Bar: Year Selection, Admin View Switcher, and Export PDF */}
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
@@ -1535,7 +1586,14 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredReportsLog.slice(0, 150).map((r, idx) => (
+                    {filteredReportsLog.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-slate-400">
+                          Belum ada riwayat laporan yang tersimpan pada periode ini.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredReportsLog.slice(0, 150).map((r, idx) => (
                       <tr key={r.id || idx} className="hover:bg-slate-50/80 transition">
                         <td className="py-2.5 px-3 text-center font-mono text-slate-400">{idx + 1}</td>
                         <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">
@@ -1618,11 +1676,14 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                           </span>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                   </tbody>
                 </table>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       )}

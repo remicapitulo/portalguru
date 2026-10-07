@@ -910,34 +910,49 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Kop Surat
+    // Logo Sekolah jika tersedia
+    if (config.school_logo_url) {
+      try {
+        doc.addImage(config.school_logo_url, 'PNG', 14, 10, 22, 22);
+      } catch {
+        // Fallback jika format atau cross-origin tidak mendukung addImage
+      }
+    }
+
+    // Kop Surat (Persis Rapor Penilaian Kinerja Diktendik)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(14);
     doc.setTextColor(15, 23, 42);
     doc.text((config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase(), pageWidth / 2, 14, { align: 'center' });
 
     doc.setFontSize(15);
-    doc.setTextColor(30, 58, 138);
+    doc.setTextColor(88, 28, 135);
     doc.text((config.school_name || 'SMPIT PONDOK DUTA').toUpperCase(), pageWidth / 2, 21, { align: 'center' });
 
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
     doc.text(config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat', pageWidth / 2, 26, { align: 'center' });
+    doc.text(`NPSN: ${config.npsn || '20276180'} • Status Terakreditasi "A"`, pageWidth / 2, 30, { align: 'center' });
 
-    doc.setDrawColor(30, 58, 138);
-    doc.setLineWidth(0.8);
-    doc.line(14, 29, pageWidth - 14, 29);
+    // Garis Ganda Kop Surat
+    doc.setDrawColor(88, 28, 135);
+    doc.setLineWidth(1);
+    doc.line(14, 33, pageWidth - 14, 33);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.line(14, 34.2, pageWidth - 14, 34.2);
 
     // Judul
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(15, 23, 42);
-    doc.text('REKAPITULASI DAFTAR KETIDAKHADIRAN GURU & TENAGA KEPENDIDIKAN', pageWidth / 2, 37, { align: 'center' });
+    doc.text('REKAPITULASI DAFTAR KETIDAKHADIRAN GURU & TENAGA KEPENDIDIKAN', pageWidth / 2, 42, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`Tahun Ajaran: ${config.academic_year || '2026/2027'}  •  Total Catatan: ${displayList.length} Izin/Sakit/Tugas`, pageWidth / 2, 42, { align: 'center' });
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Tahun Pelajaran: ${config.academic_year || '2026/2027'}  •  Total Catatan: ${displayList.length} Izin/Sakit/Tugas`, pageWidth / 2, 47, { align: 'center' });
 
     const rows = displayList.map((item, idx) => [
       String(idx + 1),
@@ -956,12 +971,12 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
     ]);
 
     autoTable(doc, {
-      startY: 47,
+      startY: 52,
       head: [['No', 'Tanggal', 'Nama Guru / Tendik', 'Mapel', 'Jenis', 'Ada Surat', 'Keterangan / Alasan', 'Guru Pengganti (Inval)', 'Status']],
       body: rows,
       theme: 'grid',
       styles: { fontSize: 8.5, cellPadding: 2.5 },
-      headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: 'bold', halign: 'center' },
+      headStyles: { fillColor: [88, 28, 135], textColor: 255, fontStyle: 'bold', halign: 'center' },
       columnStyles: {
         0: { halign: 'center', cellWidth: 10 },
         1: { halign: 'center', cellWidth: 30 },
@@ -2111,8 +2126,15 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
             <div className="flex items-center gap-2">
               <button
+                onClick={() => window.print()}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
+              >
+                <Printer className="w-4 h-4 text-slate-300" />
+                <span>Cetak Dokumen</span>
+              </button>
+              <button
                 onClick={handleExportPDF}
-                className="px-5 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
+                className="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs active:scale-95"
               >
                 <Download className="w-4 h-4 text-white" />
                 <span>Unduh Laporan PDF</span>
@@ -2122,17 +2144,38 @@ function uploadBuktiKetidakhadiran(fileData, meta) {
 
           {/* DOKUMEN CETAK PREVIEW */}
           <div className="border border-slate-300 rounded-2xl p-6 sm:p-8 bg-white space-y-6 text-slate-900 print:border-none print:p-0">
-            {/* KOP SURAT */}
-            <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
-              <h4 className="text-xs sm:text-sm font-extrabold uppercase tracking-wide text-slate-700">
-                {config.foundation_name || 'Yayasan Perguruan Islam Pondok Duta'}
-              </h4>
-              <h2 className="text-base sm:text-xl font-black text-blue-900 uppercase tracking-tight">
-                {config.school_name || 'SMPIT PONDOK DUTA'}
-              </h2>
-              <p className="text-[11px] text-slate-600 max-w-xl mx-auto">
-                {config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'} • NPSN: {config.npsn || '20276180'}
-              </p>
+            {/* KOP SURAT RESMI (Persis Rapor Penilaian Kinerja Diktendik) */}
+            <div className="border-b-2 border-purple-900 pb-3 mb-5">
+              <div className="flex items-center justify-between gap-4">
+                {config.school_logo_url ? (
+                  <img
+                    src={config.school_logo_url}
+                    alt="Logo Sekolah"
+                    className="w-16 h-16 object-contain rounded-lg p-0.5 border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-purple-100 text-purple-900 font-black flex items-center justify-center text-xl shrink-0">
+                    PD
+                  </div>
+                )}
+                <div className="text-center flex-1">
+                  <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    {(config.foundation_name || 'YAYASAN PERGURUAN ISLAM PONDOK DUTA').toUpperCase()}
+                  </h3>
+                  <h1 className="text-xl sm:text-2xl font-black text-purple-950 tracking-tight">
+                    {(config.school_name || 'SMPIT PONDOK DUTA').toUpperCase()}
+                  </h1>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {config.school_address || 'Jl. Duta Plaza No. 1, Cimanggis, Depok, Jawa Barat'} • NPSN: {config.npsn || '20276180'}
+                  </p>
+                  <p className="text-[10px] text-purple-700 font-bold uppercase tracking-wider">
+                    TERAKREDITASI &bull; RAPOR PENILAIAN KINERJA PENDIDIK &amp; TENAGA KEPENDIDIKAN
+                  </p>
+                </div>
+                <div className="w-16 shrink-0 hidden sm:block"></div>
+              </div>
+              {/* Double decorative border line */}
+              <div className="h-0.5 bg-slate-300 mt-2"></div>
             </div>
 
             {/* JUDUL DOKUMEN */}
