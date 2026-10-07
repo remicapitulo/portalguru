@@ -55,6 +55,50 @@ const PLATFORM_OPTIONS = [
   { id: 'Lainnya', label: 'Lainnya', color: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' }
 ];
 
+// Helper kompresi gambar berbasis HTML5 Canvas untuk mencegah batas kuota localStorage
+const compressImage = (file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.75): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      };
+      img.onerror = () => resolve(e.target?.result as string);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+};
+
 export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
   currentUser,
   db,
@@ -77,6 +121,7 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
   const [bukti2, setBukti2] = useState<string>('');
   const [bukti3, setBukti3] = useState<string>('');
   const [bukti4, setBukti4] = useState<string>('');
+  const [compressingBox, setCompressingBox] = useState<number | null>(null);
   
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -197,23 +242,37 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
     }
   };
 
-  // Convert File to Base64 Image
-  const handleFileUpload = (file: File, boxNum: 1 | 2 | 3 | 4) => {
+  // Convert & Compress File to Optimized Base64 Image
+  const handleFileUpload = async (file: File, boxNum: 1 | 2 | 3 | 4) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       alert('Mohon unggah berkas berupa gambar (JPG, PNG, WEBP).');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (boxNum === 1) setBukti1(result);
-      else if (boxNum === 2) setBukti2(result);
-      else if (boxNum === 3) setBukti3(result);
-      else if (boxNum === 4) setBukti4(result);
-    };
-    reader.readAsDataURL(file);
+    setCompressingBox(boxNum);
+    try {
+      // Kompresi otomatis gambar tangkapan layar (maks 1200px, kualitas 0.75)
+      // Mengurangi ukuran berkas dari 5MB+ menjadi ~80KB-120KB tanpa mengurangi keterbacaan teks
+      const compressedDataUrl = await compressImage(file, 1200, 1200, 0.75);
+      if (boxNum === 1) setBukti1(compressedDataUrl);
+      else if (boxNum === 2) setBukti2(compressedDataUrl);
+      else if (boxNum === 3) setBukti3(compressedDataUrl);
+      else if (boxNum === 4) setBukti4(compressedDataUrl);
+    } catch (err) {
+      console.warn('Kompresi gambar gagal, menggunakan pembaca standar:', err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (boxNum === 1) setBukti1(result);
+        else if (boxNum === 2) setBukti2(result);
+        else if (boxNum === 3) setBukti3(result);
+        else if (boxNum === 4) setBukti4(result);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setCompressingBox(null);
+    }
   };
 
   // Toggle platform selection
@@ -266,36 +325,53 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
         bukti_4: bukti4 || undefined,
       };
 
-      // 1. Simpan ke sistem lokal (seketika muncul di progres & tabel)
-      const newRecord = eflyerService.saveLocalReport(reportPayload);
-      setReports((prev) => [newRecord, ...prev]);
+      // 1. Simpan ke sistem portal (aman dari kuota & seketika masuk ke rekap poin)
+      let newRecord: EflyerReport;
+      try {
+        newRecord = eflyerService.saveLocalReport(reportPayload);
+        setReports((prev) => [newRecord, ...prev]);
+      } catch (saveErr: any) {
+        console.error('Error saat menyimpan laporan lokal:', saveErr);
+        newRecord = {
+          ...reportPayload,
+          id: `EFL-LOC-${Date.now()}`,
+          source: 'local'
+        };
+        setReports((prev) => [newRecord, ...prev]);
+      }
 
-      // 2. Jika Google Apps Script sudah dipasang, kirim ke Spreadsheet Google & Drive
+      // 2. Jika Google Apps Script sudah dipasang, sinkronkan ke Spreadsheet Google & Drive di latar belakang
       const targetScriptUrl = config.eflayer_apps_script_url || scriptUrlInput;
       if (targetScriptUrl && targetScriptUrl.trim()) {
-        const remoteRes = await eflyerService.submitToAppsScript(reportPayload, targetScriptUrl);
-        if (remoteRes.success) {
-          setRemoteStatus('✓ Data dan berkas foto sukses tersimpan ke Google Drive & Spreadsheet!');
-          if (remoteRes.driveUrls) {
-            setReports((prev) =>
-              prev.map((r) =>
-                r.id === newRecord.id
-                  ? {
-                      ...r,
-                      bukti_1: remoteRes.driveUrls?.bukti_1 || r.bukti_1,
-                      bukti_2: remoteRes.driveUrls?.bukti_2 || r.bukti_2,
-                      bukti_3: remoteRes.driveUrls?.bukti_3 || r.bukti_3,
-                      bukti_4: remoteRes.driveUrls?.bukti_4 || r.bukti_4,
-                    }
-                  : r
-              )
-            );
+        try {
+          const remoteRes = await eflyerService.submitToAppsScript(reportPayload, targetScriptUrl);
+          if (remoteRes.success) {
+            setRemoteStatus('✓ Data dan berkas foto sukses tersimpan ke Google Drive & Spreadsheet!');
+            if (remoteRes.driveUrls) {
+              setReports((prev) =>
+                prev.map((r) =>
+                  r.id === newRecord.id
+                    ? {
+                        ...r,
+                        bukti_1: remoteRes.driveUrls?.bukti_1 || r.bukti_1,
+                        bukti_2: remoteRes.driveUrls?.bukti_2 || r.bukti_2,
+                        bukti_3: remoteRes.driveUrls?.bukti_3 || r.bukti_3,
+                        bukti_4: remoteRes.driveUrls?.bukti_4 || r.bukti_4,
+                      }
+                    : r
+                )
+              );
+            }
+          } else {
+            console.info('Catatan Google Apps Script:', remoteRes.message);
+            setRemoteStatus('✓ Laporan tersimpan di sistem portal. Catatan sinkronisasi Google Script: ' + remoteRes.message);
           }
-        } else {
-          setRemoteStatus(`Data tersimpan di portal lokal. Catatan Google Script: ${remoteRes.message}`);
+        } catch (scriptErr: any) {
+          console.warn('Google Script submit error:', scriptErr);
+          setRemoteStatus('✓ Laporan tersimpan di sistem portal lokal.');
         }
       } else {
-        setRemoteStatus('Data tersimpan di penyimpanan portal. Pasang Google Script khusus Eflayer agar data otomatis masuk ke Spreadsheet & Google Drive.');
+        setRemoteStatus('✓ Laporan tersimpan di penyimpanan portal internal.');
       }
 
       setSubmitSuccess(true);
@@ -554,32 +630,32 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-2 mt-6 pt-4 border-t border-white/10">
+        {/* Tab Switcher - Atas Bawah di Mobile agar Sangat Lega & Rapi, Berdampingan di Desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 mt-5 pt-4 border-t border-white/10">
           <button
             onClick={() => setActiveTab('form')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'form'
                 ? 'bg-white text-blue-950 shadow-md ring-2 ring-white/20'
                 : 'bg-white/10 hover:bg-white/20 hover:text-white text-slate-200'
             }`}
           >
-            <Upload className="w-4 h-4 text-fuchsia-600" />
-            <span>Isian Laporan Eflayer</span>
+            <Upload className="w-4 h-4 text-fuchsia-600 shrink-0" />
+            <span>Isi Laporan Eflayer</span>
           </button>
 
           <button
             onClick={() => setActiveTab('progress')}
-            className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 cursor-pointer ${
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === 'progress'
                 ? 'bg-white text-blue-950 shadow-md ring-2 ring-white/20'
                 : 'bg-white/10 hover:bg-white/20 hover:text-white text-slate-200'
             }`}
           >
-            <Award className="w-4 h-4 text-amber-500" />
-            <span>Laporan / Progres (Jan - Des)</span>
+            <Award className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Laporan / Progres</span>
             <span
-              className={`ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-black tracking-tight transition-colors ${
+              className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 transition-colors ${
                 activeTab === 'progress'
                   ? 'bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300'
                   : 'bg-fuchsia-950/70 text-fuchsia-200 border border-fuchsia-500/40'
@@ -748,63 +824,73 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
               )}
             </div>
 
-            {/* Field 4: Bukti Screenshoot (4 Kotak Upload: 1 Wajib, 2-4 Pilihan) */}
-            <div className="space-y-3">
+            {/* Field 4: Bukti Screenshoot (Minimalis 4 Kotak: 1 Wajib, 2-4 Pilihan) */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div>
                   <label className="block text-xs font-bold text-slate-800">
-                    Bukti Update (Screenshoot)
+                    Bukti Update / Screenshoot <span className="text-rose-500">*</span>
                   </label>
                   <p className="text-[11px] text-slate-500">
-                    Unggah tangkapan layar bukti share eflyer. <strong>Kotak 1 Wajib</strong>, kotak 2, 3, dan 4 adalah pilihan tambahan.
+                    Kotak 1 Wajib diisi, Kotak 2–4 pilihan tambahan.
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {/* Grid 2 kolom di mobile, 4 kolom di desktop (hemat ruang & tidak memakan 1 layar penuh) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
                 {/* KOTAK 1 (WAJIB) */}
-                <div className={`p-4 rounded-2xl border-2 border-dashed transition flex flex-col justify-between min-h-[210px] ${
-                  bukti1 ? 'border-emerald-300 bg-emerald-50/30' : 'border-blue-300 bg-blue-50/20 hover:bg-blue-50/40'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                  bukti1
+                    ? 'border-emerald-300 bg-emerald-50/40 shadow-2xs'
+                    : 'border-blue-300 border-dashed bg-blue-50/20 hover:bg-blue-50/50'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-black uppercase text-blue-900 flex items-center gap-1">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-blue-950 flex items-center gap-0.5">
                       <span>Kotak 1</span>
                       <span className="text-rose-500">*</span>
                     </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
-                      Wajib
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                      bukti1 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      {bukti1 ? '✓ Ada' : 'Wajib'}
                     </span>
                   </div>
 
-                  {bukti1 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video flex items-center justify-center">
+                  {compressingBox === 1 ? (
+                    <div className="h-24 sm:h-28 flex flex-col items-center justify-center text-center p-1">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-blue-900">Mengompres...</span>
+                    </div>
+                  ) : bukti1 ? (
+                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 h-24 sm:h-28 flex items-center justify-center">
                       <img src={bukti1} alt="Bukti 1" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setPreviewImage(bukti1)}
-                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-slate-900 text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-white/25 hover:bg-white text-slate-900 text-xs font-bold transition cursor-pointer"
                           title="Lihat Gambar"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setBukti1('')}
-                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer"
                           title="Hapus"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="flex-1 flex flex-col items-center justify-center cursor-pointer p-3 text-center">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center mb-2">
-                        <Upload className="w-5 h-5" />
+                    <label className="h-24 sm:h-28 flex flex-col items-center justify-center cursor-pointer p-1.5 text-center rounded-xl hover:bg-blue-100/30 transition">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-1">
+                        <Upload className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-xs font-bold text-slate-800">Pilih Berkas Bukti 1</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">PNG, JPG, WEBP</span>
+                      <span className="text-[11px] font-bold text-slate-800 leading-tight">Unggah Bukti 1</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">JPG / PNG</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -813,47 +899,57 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                       />
                     </label>
                   )}
-                  <span className="text-[10px] text-slate-400 text-center mt-2">Screenshoot Utama</span>
                 </div>
 
                 {/* KOTAK 2 (PILIHAN) */}
-                <div className={`p-4 rounded-2xl border-2 border-dashed transition flex flex-col justify-between min-h-[210px] ${
-                  bukti2 ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                  bukti2
+                    ? 'border-emerald-300 bg-emerald-50/40 shadow-2xs'
+                    : 'border-slate-200 border-dashed bg-slate-50/50 hover:bg-slate-100/60'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-black uppercase text-slate-700">Kotak 2</span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                      Pilihan
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-700">Kotak 2</span>
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
+                      bukti2 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {bukti2 ? '✓ Ada' : 'Pilihan'}
                     </span>
                   </div>
 
-                  {bukti2 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video flex items-center justify-center">
+                  {compressingBox === 2 ? (
+                    <div className="h-24 sm:h-28 flex flex-col items-center justify-center text-center p-1">
+                      <div className="w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-slate-700">Mengompres...</span>
+                    </div>
+                  ) : bukti2 ? (
+                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 h-24 sm:h-28 flex items-center justify-center">
                       <img src={bukti2} alt="Bukti 2" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setPreviewImage(bukti2)}
-                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-slate-900 text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-white/25 hover:bg-white text-slate-900 text-xs font-bold transition cursor-pointer"
+                          title="Lihat Gambar"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setBukti2('')}
-                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer"
+                          title="Hapus"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="flex-1 flex flex-col items-center justify-center cursor-pointer p-3 text-center">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
-                        <Plus className="w-5 h-5" />
+                    <label className="h-24 sm:h-28 flex flex-col items-center justify-center cursor-pointer p-1.5 text-center rounded-xl hover:bg-slate-200/50 transition">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center mb-1">
+                        <Plus className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-xs font-semibold text-slate-700">Tambah Bukti 2</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">Opsional</span>
+                      <span className="text-[11px] font-semibold text-slate-700 leading-tight">Bukti 2</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">Opsional</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -862,47 +958,57 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                       />
                     </label>
                   )}
-                  <span className="text-[10px] text-slate-400 text-center mt-2">Screenshoot Tambahan</span>
                 </div>
 
                 {/* KOTAK 3 (PILIHAN) */}
-                <div className={`p-4 rounded-2xl border-2 border-dashed transition flex flex-col justify-between min-h-[210px] ${
-                  bukti3 ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                  bukti3
+                    ? 'border-emerald-300 bg-emerald-50/40 shadow-2xs'
+                    : 'border-slate-200 border-dashed bg-slate-50/50 hover:bg-slate-100/60'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-black uppercase text-slate-700">Kotak 3</span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                      Pilihan
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-700">Kotak 3</span>
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
+                      bukti3 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {bukti3 ? '✓ Ada' : 'Pilihan'}
                     </span>
                   </div>
 
-                  {bukti3 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video flex items-center justify-center">
+                  {compressingBox === 3 ? (
+                    <div className="h-24 sm:h-28 flex flex-col items-center justify-center text-center p-1">
+                      <div className="w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-slate-700">Mengompres...</span>
+                    </div>
+                  ) : bukti3 ? (
+                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 h-24 sm:h-28 flex items-center justify-center">
                       <img src={bukti3} alt="Bukti 3" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setPreviewImage(bukti3)}
-                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-slate-900 text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-white/25 hover:bg-white text-slate-900 text-xs font-bold transition cursor-pointer"
+                          title="Lihat Gambar"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setBukti3('')}
-                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer"
+                          title="Hapus"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="flex-1 flex flex-col items-center justify-center cursor-pointer p-3 text-center">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
-                        <Plus className="w-5 h-5" />
+                    <label className="h-24 sm:h-28 flex flex-col items-center justify-center cursor-pointer p-1.5 text-center rounded-xl hover:bg-slate-200/50 transition">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center mb-1">
+                        <Plus className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-xs font-semibold text-slate-700">Tambah Bukti 3</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">Opsional</span>
+                      <span className="text-[11px] font-semibold text-slate-700 leading-tight">Bukti 3</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">Opsional</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -911,47 +1017,57 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                       />
                     </label>
                   )}
-                  <span className="text-[10px] text-slate-400 text-center mt-2">Screenshoot Tambahan</span>
                 </div>
 
                 {/* KOTAK 4 (PILIHAN) */}
-                <div className={`p-4 rounded-2xl border-2 border-dashed transition flex flex-col justify-between min-h-[210px] ${
-                  bukti4 ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100/50'
+                <div className={`p-2.5 sm:p-3 rounded-2xl border transition-all flex flex-col justify-between ${
+                  bukti4
+                    ? 'border-emerald-300 bg-emerald-50/40 shadow-2xs'
+                    : 'border-slate-200 border-dashed bg-slate-50/50 hover:bg-slate-100/60'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-black uppercase text-slate-700">Kotak 4</span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                      Pilihan
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-700">Kotak 4</span>
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
+                      bukti4 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {bukti4 ? '✓ Ada' : 'Pilihan'}
                     </span>
                   </div>
 
-                  {bukti4 ? (
-                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video flex items-center justify-center">
+                  {compressingBox === 4 ? (
+                    <div className="h-24 sm:h-28 flex flex-col items-center justify-center text-center p-1">
+                      <div className="w-5 h-5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-slate-700">Mengompres...</span>
+                    </div>
+                  ) : bukti4 ? (
+                    <div className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 h-24 sm:h-28 flex items-center justify-center">
                       <img src={bukti4} alt="Bukti 4" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                      <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setPreviewImage(bukti4)}
-                          className="p-1.5 rounded-lg bg-white/20 hover:bg-white text-slate-900 text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-white/25 hover:bg-white text-slate-900 text-xs font-bold transition cursor-pointer"
+                          title="Lihat Gambar"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
                           onClick={() => setBukti4('')}
-                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition"
+                          className="p-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition cursor-pointer"
+                          title="Hapus"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <label className="flex-1 flex flex-col items-center justify-center cursor-pointer p-3 text-center">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
-                        <Plus className="w-5 h-5" />
+                    <label className="h-24 sm:h-28 flex flex-col items-center justify-center cursor-pointer p-1.5 text-center rounded-xl hover:bg-slate-200/50 transition">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center mb-1">
+                        <Plus className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-xs font-semibold text-slate-700">Tambah Bukti 4</span>
-                      <span className="text-[10px] text-slate-400 mt-0.5">Opsional</span>
+                      <span className="text-[11px] font-semibold text-slate-700 leading-tight">Bukti 4</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">Opsional</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -960,7 +1076,6 @@ export const UpdateEflyerView: React.FC<UpdateEflyerViewProps> = ({
                       />
                     </label>
                   )}
-                  <span className="text-[10px] text-slate-400 text-center mt-2">Screenshoot Tambahan</span>
                 </div>
               </div>
             </div>

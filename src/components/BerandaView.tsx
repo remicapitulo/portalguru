@@ -414,18 +414,19 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setEventFilterMode('h30')}
-              className={`flex-1 sm:flex-none justify-center px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 eventFilterMode === 'h30'
                   ? 'bg-blue-700 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
+              <Clock className="w-3.5 h-3.5 shrink-0 opacity-80" />
               <span>30 Hari ke Depan</span>
               <span
-                className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
                   eventFilterMode === 'h30' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
               >
@@ -434,15 +435,16 @@ export const BerandaView: React.FC<BerandaViewProps> = ({
             </button>
             <button
               onClick={() => setEventFilterMode('all')}
-              className={`flex-1 sm:flex-none justify-center px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+              className={`w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
                 eventFilterMode === 'all'
                   ? 'bg-blue-700 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
+              <Calendar className="w-3.5 h-3.5 shrink-0 opacity-80" />
               <span>Semua Agenda</span>
               <span
-                className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+                className={`ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
                   eventFilterMode === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
               >

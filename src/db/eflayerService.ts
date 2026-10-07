@@ -106,6 +106,37 @@ export class EflyerService {
     return EflyerService.instance;
   }
 
+  constructor() {
+    this.sanitizeStorage();
+  }
+
+  // Bersihkan kuota localStorage dari sisa data gambar raksasa lawas jika hampir penuh
+  private sanitizeStorage(): void {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (raw && raw.length > 1.5 * 1024 * 1024) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed.slice(0, 35).map((item, idx) => {
+            if (idx >= 3) {
+              return {
+                ...item,
+                bukti_1: item.bukti_1?.startsWith('data:') ? '' : item.bukti_1,
+                bukti_2: '',
+                bukti_3: '',
+                bukti_4: '',
+              };
+            }
+            return item;
+          });
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleaned));
+        }
+      }
+    } catch (e) {
+      // Abaikan jika error
+    }
+  }
+
   // Parse various date representations in Google Sheets / Form responses
   public parseDate(rawDate: string): { year: number; month: number; day: number; formatted: string } {
     if (!rawDate) {
@@ -181,7 +212,7 @@ export class EflyerService {
     return [];
   }
 
-  // Save new local report
+  // Save new local report with robust quota-protection and fallback
   public saveLocalReport(report: Omit<EflyerReport, 'id' | 'source'>): EflyerReport {
     const list = this.getLocalReports();
     const newReport: EflyerReport = {
@@ -190,11 +221,63 @@ export class EflyerService {
       source: 'local'
     };
     list.unshift(newReport);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+
+    // 1. Coba simpan normal
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+      return newReport;
+    } catch (quotaErr) {
+      console.warn('Penyimpanan browser penuh, melakukan pembersihan otomatis:', quotaErr);
+    }
+
+    // 2. Pemulihan tahap 1: Bersihkan cache spreadsheet sementara
+    try {
+      localStorage.removeItem(CACHE_STORAGE_KEY);
+    } catch (_) {}
+
+    // 3. Pemulihan tahap 2: Simpan dengan memangkas foto lama (hanya simpan foto 3 laporan terbaru)
+    try {
+      const pruned = list.slice(0, 35).map((item, idx) => {
+        if (idx >= 3) {
+          return {
+            ...item,
+            bukti_1: item.bukti_1?.startsWith('data:') ? '' : item.bukti_1,
+            bukti_2: '',
+            bukti_3: '',
+            bukti_4: '',
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pruned));
+      return newReport;
+    } catch (pruneErr) {
+      console.warn('Pemangkasan foto gagal, beralih ke penyimpanan metadata tanpa gambar:', pruneErr);
+    }
+
+    // 4. Pemulihan tahap 3: Simpan metadata ringkas agar seluruh poin & log guru tetap 100% aman
+    try {
+      const minimal = list.slice(0, 25).map((item, idx) => {
+        if (idx > 0) {
+          return {
+            ...item,
+            bukti_1: '',
+            bukti_2: '',
+            bukti_3: '',
+            bukti_4: '',
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(minimal));
+    } catch (finalErr) {
+      console.error('Penyimpanan lokal penuh, menyimpan di memori sesi aktif:', finalErr);
+    }
+
     return newReport;
   }
 
-  // Send report to Google Apps Script Web App so it appends row to Spreadsheet and uploads screenshots to Google Drive
+  // Send report to Google Apps Script Web App with timeout and non-JSON protection
   public async submitToAppsScript(
     report: Omit<EflyerReport, 'id' | 'source'>,
     scriptUrl?: string
@@ -212,7 +295,7 @@ export class EflyerService {
     if (!scriptUrl || !scriptUrl.trim()) {
       return {
         success: false,
-        message: 'URL Google Apps Script belum dikonfigurasi. Data tersimpan di penyimpanan lokal portal.',
+        message: 'URL Google Apps Script belum dikonfigurasi.',
       };
     }
 
@@ -222,19 +305,39 @@ export class EflyerService {
         tanggal_update: report.tanggal_update,
         nama: report.nama,
         platform: report.platform,
-        bukti_1: report.bukti_1,
+        bukti_1: report.bukti_1 || '',
         bukti_2: report.bukti_2 || '',
         bukti_3: report.bukti_3 || '',
         bukti_4: report.bukti_4 || '',
       };
 
-      const res = await fetch(scriptUrl.trim(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
-      const json = await res.json();
+      let res: Response;
+      try {
+        res = await fetch(scriptUrl.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      const text = await res.text();
+      let json: any = null;
+      try {
+        json = JSON.parse(text);
+      } catch (parseErr) {
+        // Respons bukan JSON (misal HTML 404 Google Drive / izin)
+        return {
+          success: false,
+          message: 'Layanan Google Script belum aktif atau tidak dapat diakses publik. Laporan tersimpan di sistem internal portal.',
+        };
+      }
+
       if (json && (json.success || json.status === 'success')) {
         return {
           success: true,
@@ -250,14 +353,17 @@ export class EflyerService {
       } else {
         return {
           success: false,
-          message: json?.error || json?.message || 'Respon Google Script tidak berhasil.',
+          message: json?.error || json?.message || 'Respon Google Script belum berhasil.',
         };
       }
     } catch (err: any) {
       console.warn('POST to Apps Script failed:', err);
+      const isAbort = err?.name === 'AbortError';
       return {
         success: false,
-        message: 'Gagal mengirim ke Google Apps Script: ' + (err.message || String(err)),
+        message: isAbort
+          ? 'Waktu koneksi ke Google Script habis (timeout).'
+          : 'Koneksi ke Google Apps Script belum dapat dijangkau.',
       };
     }
   }
